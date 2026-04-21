@@ -15,9 +15,13 @@ export class AuthService {
 
   login(body: LoginRequest) {
     return this.http.post<AuthResponse>(`${this.base}/api/v1/auth/login`, body).pipe(
-      tap(res => {
-        localStorage.setItem('stocksentry_token', res.token);
-      })
+      tap(res => localStorage.setItem('stocksentry_token', res.token))
+    );
+  }
+
+  fetchMe() {
+    return this.http.get<MeResponse>(`${this.base}/api/v1/auth/me`).pipe(
+      tap(user => this.currentUser.set(user))
     );
   }
 

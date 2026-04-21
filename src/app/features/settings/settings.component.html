@@ -1,0 +1,137 @@
+<div class="layout">
+  <app-topbar />
+
+  <main class="content">
+    <div class="page-header">
+      <h1 class="page-title">Configurações</h1>
+    </div>
+
+    <div class="settings-grid">
+
+      <!-- ── Sincronização ──────────────────────────────── -->
+      <section class="card">
+        <div class="card__header">
+          <h2 class="card__title">Sincronização automática</h2>
+          <p class="card__desc">
+            Define com que frequência o sistema busca novos dados do estoque.
+            O Dashboard aplica a mudança imediatamente, sem precisar recarregar a página.
+          </p>
+        </div>
+
+        <div class="card__body">
+          <div class="form-row">
+            <label class="form-label" for="sync-interval">Intervalo de sync</label>
+            <select
+              id="sync-interval"
+              class="form-select"
+              [(ngModel)]="selectedInterval"
+            >
+              @for (opt of settingsService.intervalOptions; track opt.value) {
+                <option [value]="opt.value">{{ opt.label }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn-primary" (click)="saveSyncInterval()">
+              Salvar intervalo
+            </button>
+            @if (syncSaved()) {
+              <span class="feedback feedback--success">Salvo. Polling atualizado.</span>
+            }
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Configs de alerta ──────────────────────────── -->
+      <section class="card">
+        <div class="card__header">
+          <h2 class="card__title">Canais de alerta</h2>
+          <p class="card__desc">
+            Destinos que recebem notificação quando um produto entra em estoque crítico.
+          </p>
+        </div>
+
+        <div class="card__body">
+          @if (configLoading()) {
+            <div class="config-list">
+              @for (_ of [1,2]; track $index) {
+                <div class="config-item">
+                  <span class="sk sk--text-sm" style="width:50px"></span>
+                  <span class="sk sk--text-sm sk--w-1\/2"></span>
+                </div>
+              }
+            </div>
+          } @else if (alertConfigs().length === 0) {
+            <p class="empty-inline">Nenhum canal configurado.</p>
+          } @else {
+            <ul class="config-list">
+              @for (c of alertConfigs(); track c.id) {
+                <li class="config-item">
+                  <span class="type-chip type-chip--{{ c.type.toLowerCase() }}">{{ c.type }}</span>
+                  <span class="config-dest">{{ c.destination }}</span>
+                  <button
+                    class="btn-delete"
+                    (click)="deleteConfig(c.id)"
+                    title="Remover"
+                    aria-label="Remover canal {{ c.destination }}"
+                  >✕</button>
+                </li>
+              }
+            </ul>
+          }
+
+          <div class="add-form">
+            <select class="form-select form-select--sm" [(ngModel)]="newType">
+              <option value="EMAIL">E-mail</option>
+              <option value="PUSH">Push</option>
+            </select>
+            <input
+              class="form-input"
+              type="text"
+              [(ngModel)]="newDest"
+              [placeholder]="newType === 'EMAIL' ? 'email@exemplo.com' : 'device-id'"
+              (keydown.enter)="addConfig()"
+            />
+            <button class="btn-primary" (click)="addConfig()" [disabled]="!newDest.trim() || configSaving()">
+              @if (configSaving()) { Adicionando... } @else { Adicionar }
+            </button>
+          </div>
+
+          @if (configError()) {
+            <p class="error-msg">{{ configError() }}</p>
+          }
+        </div>
+      </section>
+
+      <!-- ── Conta ───────────────────────────────────────── -->
+      <section class="card">
+        <div class="card__header">
+          <h2 class="card__title">Conta</h2>
+        </div>
+
+        <div class="card__body">
+          @if (userLoading()) {
+            <div class="user-info">
+              <span class="sk sk--text-sm sk--w-1\/2"></span>
+              <span class="sk sk--text-sm sk--w-1\/3" style="margin-top:6px"></span>
+            </div>
+          } @else if (currentUser()) {
+            <div class="user-info">
+              <p class="user-name">{{ currentUser()!.name || currentUser()!.email }}</p>
+              <p class="user-email">{{ currentUser()!.email }}</p>
+              <p class="user-role">
+                <span class="role-chip">{{ currentUser()!.role }}</span>
+              </p>
+            </div>
+          }
+
+          <div class="form-actions" style="margin-top: 20px">
+            <button class="btn-danger" (click)="logout()">Encerrar sessão</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>

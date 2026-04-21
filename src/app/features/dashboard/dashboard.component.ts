@@ -1,9 +1,10 @@
-import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { catchError, forkJoin, interval, of, switchMap, tap } from 'rxjs';
 import { SyncService } from '../../core/services/sync.service';
 import { ProductService } from '../../core/services/product.service';
+import { SettingsService } from '../../core/services/settings.service';
 import { SyncStatusResponse } from '../../core/models/sync.model';
 import { ProductResponse } from '../../core/models/product.model';
 import { TopbarComponent } from '../../shared/components/topbar/topbar.component';
@@ -14,22 +15,28 @@ import { BrDatePipe } from '../../shared/pipes/br-date.pipe';
   standalone: true,
   imports: [RouterLink, TopbarComponent, BrDatePipe],
   templateUrl: './dashboard.component.html',
-  styleUrl: './dashboard.component.scss'
+  styleUrl: './dashboard.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class DashboardComponent implements OnInit {
-  private readonly syncService = inject(SyncService);
+  private readonly syncService    = inject(SyncService);
   private readonly productService = inject(ProductService);
-  private readonly destroyRef = inject(DestroyRef);
+  private readonly settingsService = inject(SettingsService);
+  private readonly destroyRef     = inject(DestroyRef);
 
-  readonly syncStatus = signal<SyncStatusResponse | null>(null);
+  // reactive stream — emits whenever the saved interval changes
+  private readonly interval$ = toObservable(this.settingsService.syncIntervalMs);
+
+  readonly syncStatus      = signal<SyncStatusResponse | null>(null);
   readonly criticalProducts = signal<ProductResponse[]>([]);
-  readonly outOfStock = signal<ProductResponse[]>([]);
-  readonly loading = signal(true);
-  readonly syncing = signal(false);
-  readonly syncFeedback = signal<'success' | 'error' | null>(null);
+  readonly outOfStock      = signal<ProductResponse[]>([]);
+  readonly loading         = signal(true);
+  readonly syncing         = signal(false);
+  readonly syncFeedback    = signal<'success' | 'error' | null>(null);
+  readonly syncIntervalLabel = this.settingsService.labelFor;
 
   ngOnInit(): void {
-    // Auto-sync on entry, then load data
+    // Sync imediato ao entrar
     this.syncing.set(true);
     this.syncService.syncNow().pipe(
       catchError(() => of(null)),
@@ -37,8 +44,9 @@ export class DashboardComponent implements OnInit {
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
 
-    // Background polling every 5 min (data only)
-    interval(300_000).pipe(
+    // Polling reativo — reinicia automaticamente se o intervalo mudar nas configurações
+    this.interval$.pipe(
+      switchMap(ms => interval(ms)),
       switchMap(() => this.fetchAll()),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
@@ -86,8 +94,11 @@ export class DashboardComponent implements OnInit {
     });
   }
 
+  get currentIntervalLabel(): string {
+    return this.settingsService.labelFor(this.settingsService.syncIntervalMs());
+  }
+
   stockLabel(p: ProductResponse): string {
-    if (p.currentStock === 0) return '0';
-    return `${p.currentStock}`;
+    return p.currentStock === 0 ? '0' : `${p.currentStock}`;
   }
 }
