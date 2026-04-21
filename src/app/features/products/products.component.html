@@ -1,0 +1,115 @@
+<div class="layout">
+  <app-topbar />
+
+  <main class="content">
+    <div class="page-header">
+      <h1 class="page-title">Produtos</h1>
+    </div>
+
+    <div class="filters">
+      <button class="filter-btn" [class.filter-btn--active]="filter() === 'all'"        (click)="setFilter('all')">Todos</button>
+      <button class="filter-btn" [class.filter-btn--active]="filter() === 'critical'"   (click)="setFilter('critical')">Críticos</button>
+      <button class="filter-btn" [class.filter-btn--active]="filter() === 'outofstock'" (click)="setFilter('outofstock')">Zerados</button>
+    </div>
+
+    <section class="table-section">
+      @if (loading()) {
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Produto</th><th>SKU</th><th>Unidade</th><th>Estoque</th><th>Mínimo</th><th>Status</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (_ of [1,2,3,4,5,6,7,8]; track $index) {
+              <tr>
+                <td><span class="sk sk--text-sm sk--w-3\/4"></span></td>
+                <td><span class="sk sk--text-sm sk--w-1\/2"></span></td>
+                <td><span class="sk sk--text-sm sk--w-1\/4"></span></td>
+                <td><span class="sk sk--text-sm sk--w-1\/3"></span></td>
+                <td><span class="sk sk--text-sm sk--w-1\/3"></span></td>
+                <td><span class="sk sk--text-sm sk--w-1\/2"></span></td>
+                <td></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      } @else if (rows().length === 0) {
+        <p class="empty-state">Nenhum produto encontrado.</p>
+      } @else {
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Produto</th>
+              <th>SKU</th>
+              <th>Un.</th>
+              <th>Estoque</th>
+              <th>Mínimo</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of rows(); track p.id) {
+              <tr>
+                <td class="td-name">{{ p.name }}</td>
+                <td class="td-mono">{{ p.sku }}</td>
+                <td class="td-muted">{{ p.unit }}</td>
+                <td>
+                  <span class="stock-chip" [class.stock-chip--zero]="p.currentStock === 0" [class.stock-chip--warn]="p.critical && p.currentStock > 0">
+                    {{ p.currentStock }}
+                  </span>
+                </td>
+                <td>
+                  @if (editingId() === p.id) {
+                    <div class="edit-inline">
+                      <input
+                        type="number"
+                        class="edit-input"
+                        [ngModel]="editingValue()"
+                        (ngModelChange)="editingValue.set($event)"
+                        min="0"
+                      />
+                      <button class="btn-save" (click)="saveEdit(p)" [disabled]="saving()">Salvar</button>
+                      <button class="btn-cancel" (click)="cancelEdit()">✕</button>
+                    </div>
+                  } @else {
+                    <span class="td-muted">{{ p.minStock }} {{ p.unit }}</span>
+                  }
+                </td>
+                <td>
+                  @switch (statusLabel(p)) {
+                    @case ('zero')     { <span class="status-chip status-chip--zero">Zerado</span> }
+                    @case ('critical') { <span class="status-chip status-chip--critical">Crítico</span> }
+                    @default           { <span class="status-chip status-chip--ok">Normal</span> }
+                  }
+                </td>
+                <td class="td-action">
+                  @if (editingId() !== p.id) {
+                    <button class="btn-edit" (click)="startEdit(p)" title="Editar estoque mínimo">Editar mín.</button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </section>
+
+    @if (!loading() && totalPages() > 1) {
+      <div class="pagination">
+        <button class="page-btn" [disabled]="currentPage() === 0" (click)="goToPage(currentPage() - 1)">
+          &lsaquo; Anterior
+        </button>
+        @for (p of pages(); track p) {
+          <button class="page-btn" [class.page-btn--active]="p === currentPage()" (click)="goToPage(p)">
+            {{ p + 1 }}
+          </button>
+        }
+        <button class="page-btn" [disabled]="currentPage() === totalPages() - 1" (click)="goToPage(currentPage() + 1)">
+          Próxima &rsaquo;
+        </button>
+      </div>
+    }
+  </main>
+</div>

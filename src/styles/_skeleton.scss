@@ -1,0 +1,22 @@
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.sk {
+  display: block;
+  background: linear-gradient(90deg, #ecedef 25%, #e2e3e6 50%, #ecedef 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 2px;
+}
+
+.sk--text-sm  { height: 11px; }
+.sk--text-md  { height: 14px; }
+.sk--text-lg  { height: 22px; }
+.sk--text-xl  { height: 36px; }
+.sk--w-full   { width: 100%; }
+.sk--w-3\/4   { width: 75%; }
+.sk--w-1\/2   { width: 50%; }
+.sk--w-1\/3   { width: 33%; }
+.sk--w-1\/4   { width: 25%; }

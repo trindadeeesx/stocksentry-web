@@ -1,0 +1,53 @@
+<div class="login-page">
+  <div class="login-card">
+    <div class="login-brand">
+      <span class="brand-name">Meiliy Cosméticos</span>
+      <span class="brand-sub">Alertas de Estoque</span>
+    </div>
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="login-form" novalidate>
+      <div class="field" [class.field--error]="form.controls.email.invalid && form.controls.email.touched">
+        <label for="email">E-mail</label>
+        <input
+          id="email"
+          type="email"
+          formControlName="email"
+          placeholder="seu@email.com"
+          autocomplete="email"
+        />
+        @if (form.controls.email.touched && form.controls.email.hasError('required')) {
+          <span class="field__error">E-mail obrigatório</span>
+        } @else if (form.controls.email.touched && form.controls.email.hasError('email')) {
+          <span class="field__error">E-mail inválido</span>
+        }
+      </div>
+
+      <div class="field" [class.field--error]="form.controls.password.invalid && form.controls.password.touched">
+        <label for="password">Senha</label>
+        <input
+          id="password"
+          type="password"
+          formControlName="password"
+          placeholder="••••••••"
+          autocomplete="current-password"
+        />
+        @if (form.controls.password.touched && form.controls.password.hasError('required')) {
+          <span class="field__error">Senha obrigatória</span>
+        }
+      </div>
+
+      @if (errorMsg()) {
+        <div class="alert-error" role="alert">{{ errorMsg() }}</div>
+      }
+
+      <button type="submit" class="btn-submit" [disabled]="loading()">
+        @if (loading()) {
+          <span class="spinner"></span>
+          Entrando...
+        } @else {
+          Entrar
+        }
+      </button>
+    </form>
+  </div>
+</div>

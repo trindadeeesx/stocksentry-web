@@ -1,0 +1,94 @@
+<div class="layout">
+  <app-topbar />
+
+  <main class="content">
+    <div class="page-header">
+      <h1 class="page-title">Histórico de Alertas</h1>
+      <div class="page-actions">
+        @if (reportFeedback()) {
+          <span class="feedback">{{ reportFeedback() }}</span>
+        }
+        <button class="btn-outline" (click)="generateReport(7)"  [disabled]="reportLoading()">Relatório 7 dias</button>
+        <button class="btn-outline" (click)="generateReport(30)" [disabled]="reportLoading()">Relatório 30 dias</button>
+      </div>
+    </div>
+
+    <div class="filters">
+      <button class="filter-btn" [class.filter-btn--active]="filter() === 'all'"       (click)="setFilter('all')">Todos</button>
+      <button class="filter-btn" [class.filter-btn--active]="filter() === 'SENT'"      (click)="setFilter('SENT')">Enviados</button>
+      <button class="filter-btn" [class.filter-btn--active]="filter() === 'FAILED'"    (click)="setFilter('FAILED')">Falhos</button>
+      <button class="filter-btn" [class.filter-btn--active]="filter() === 'EMAIL'"     (click)="setFilter('EMAIL')">E-mail</button>
+      <button class="filter-btn" [class.filter-btn--active]="filter() === 'PUSH'"      (click)="setFilter('PUSH')">Push</button>
+    </div>
+
+    <section class="table-section">
+      @if (loading()) {
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Data / Hora</th><th>Produto</th><th>Tipo</th><th>Destino</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (_ of [1,2,3,4,5,6,7,8]; track $index) {
+              <tr>
+                <td><span class="sk sk--text-sm sk--w-3\/4"></span></td>
+                <td><span class="sk sk--text-sm sk--w-1\/2"></span></td>
+                <td><span class="sk sk--text-sm sk--w-1\/4"></span></td>
+                <td><span class="sk sk--text-sm sk--w-1\/2"></span></td>
+                <td><span class="sk sk--text-sm sk--w-1\/4"></span></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      } @else if (filtered().length === 0) {
+        <p class="empty-state">Nenhum alerta encontrado.</p>
+      } @else {
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Data / Hora</th>
+              <th>Produto</th>
+              <th>Tipo</th>
+              <th>Destino</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of filtered(); track r.id) {
+              <tr>
+                <td class="td-mono">{{ r.triggeredAt | brDate }}</td>
+                <td class="td-name">{{ r.productName }}</td>
+                <td>
+                  <span class="type-chip type-chip--{{ r.type.toLowerCase() }}">{{ r.type }}</span>
+                </td>
+                <td class="td-dest">{{ r.destination }}</td>
+                <td>
+                  <span class="status-chip status-chip--{{ r.status.toLowerCase() }}">
+                    {{ r.status === 'SENT' ? 'Enviado' : 'Falhou' }}
+                  </span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </section>
+
+    @if (!loading() && totalPages() > 1) {
+      <div class="pagination">
+        <button class="page-btn" [disabled]="currentPage() === 0" (click)="loadPage(currentPage() - 1)">
+          &lsaquo; Anterior
+        </button>
+        @for (p of pages(); track p) {
+          <button class="page-btn" [class.page-btn--active]="p === currentPage()" (click)="loadPage(p)">
+            {{ p + 1 }}
+          </button>
+        }
+        <button class="page-btn" [disabled]="currentPage() === totalPages() - 1" (click)="loadPage(currentPage() + 1)">
+          Próxima &rsaquo;
+        </button>
+      </div>
+    }
+  </main>
+</div>

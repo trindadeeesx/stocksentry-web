@@ -1,0 +1,163 @@
+<div class="layout">
+  <app-topbar />
+
+  <main class="content">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Dashboard</h1>
+        @if (!loading() && syncStatus()) {
+          <p class="page-subtitle">
+            Última sync: {{ syncStatus()!.lastSyncAt | brDate }}
+          </p>
+        } @else if (loading()) {
+          <span class="sk sk--text-sm sk--w-1\/2" style="margin-top:5px"></span>
+        }
+      </div>
+      <div class="page-actions">
+        @if (syncFeedback() === 'success') {
+          <span class="feedback feedback--success">Sync concluída</span>
+        } @else if (syncFeedback() === 'error') {
+          <span class="feedback feedback--error">Falha na sync</span>
+        }
+        <button class="btn-sync" (click)="forceSync()" [disabled]="syncing()">
+          @if (syncing()) {
+            <span class="spinner"></span> Sincronizando...
+          } @else {
+            Forçar Sync
+          }
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Stats ─────────────────────── -->
+    @if (loading()) {
+      <div class="stats-row">
+        @for (_ of [1,2,3,4,5]; track $index) {
+          <div class="stat-card">
+            <span class="sk sk--text-sm sk--w-1\/2"></span>
+            <span class="sk sk--text-xl sk--w-1\/3" style="margin-top:8px"></span>
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="stats-row">
+        <div class="stat-card">
+          <span class="stat-label">Críticos</span>
+          <span class="stat-value stat-value--danger">{{ criticalProducts().length }}</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Zerados</span>
+          <span class="stat-value stat-value--danger">{{ outOfStock().length }}</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Criados</span>
+          <span class="stat-value">{{ syncStatus()?.lastCreated ?? '—' }}</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Atualizados</span>
+          <span class="stat-value">{{ syncStatus()?.lastUpdated ?? '—' }}</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Recuperados</span>
+          <span class="stat-value stat-value--success">{{ syncStatus()?.lastRecovered ?? '—' }}</span>
+        </div>
+      </div>
+    }
+
+    <!-- ── Tables ─────────────────────── -->
+    @if (loading()) {
+      <div class="tables-row">
+        @for (_ of [1,2]; track $index) {
+          <section class="table-section">
+            <div class="section-title">
+              <span class="sk sk--text-md" style="width:140px"></span>
+            </div>
+            <div class="sk-table-body">
+              @for (__ of [1,2,3,4,5,6]; track $index) {
+                <div class="sk-row">
+                  <span class="sk sk--text-sm sk--w-1\/2"></span>
+                  <span class="sk sk--text-sm sk--w-1\/4"></span>
+                  <span class="sk sk--text-sm sk--w-1\/4"></span>
+                </div>
+              }
+            </div>
+          </section>
+        }
+      </div>
+    } @else {
+      <div class="tables-row">
+        <section class="table-section">
+          <h2 class="section-title">
+            Estoque Crítico
+            <span class="badge badge--danger">{{ criticalProducts().length }}</span>
+          </h2>
+          @if (criticalProducts().length === 0) {
+            <p class="empty-state">Nenhum produto em estado crítico.</p>
+          } @else {
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Produto</th>
+                  <th>SKU</th>
+                  <th>Estoque</th>
+                  <th>Mínimo</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (p of criticalProducts().slice(0, 15); track p.id) {
+                  <tr>
+                    <td class="td-name">{{ p.name }}</td>
+                    <td class="td-mono">{{ p.sku }}</td>
+                    <td>
+                      <span class="stock-chip" [class.stock-chip--zero]="p.currentStock === 0">
+                        {{ stockLabel(p) }} {{ p.unit }}
+                      </span>
+                    </td>
+                    <td class="td-muted">{{ p.minStock }} {{ p.unit }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+            @if (criticalProducts().length > 15) {
+              <p class="table-more">
+                +{{ criticalProducts().length - 15 }} produto(s) —
+                <a routerLink="/products">ver todos</a>
+              </p>
+            }
+          }
+        </section>
+
+        <section class="table-section">
+          <h2 class="section-title">
+            Zerados
+            <span class="badge badge--danger">{{ outOfStock().length }}</span>
+          </h2>
+          @if (outOfStock().length === 0) {
+            <p class="empty-state">Nenhum produto com estoque zerado.</p>
+          } @else {
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Produto</th>
+                  <th>SKU</th>
+                  <th>Unidade</th>
+                  <th>Mínimo</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (p of outOfStock(); track p.id) {
+                  <tr>
+                    <td class="td-name">{{ p.name }}</td>
+                    <td class="td-mono">{{ p.sku }}</td>
+                    <td class="td-muted">{{ p.unit }}</td>
+                    <td class="td-muted">{{ p.minStock }} {{ p.unit }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+        </section>
+      </div>
+    }
+  </main>
+</div>
