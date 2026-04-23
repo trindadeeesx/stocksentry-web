@@ -32,7 +32,8 @@ export class PushService {
   async init(): Promise<void> {
     if (!this.supported || this.status() === 'unsupported' || this.status() === 'denied') return;
     try {
-      const reg = await navigator.serviceWorker.ready;
+      const reg = await this.getRegistration();
+      if (!reg) { this.status.set('not-subscribed'); return; }
       const sub = await reg.pushManager.getSubscription();
       this.status.set(sub ? 'subscribed' : 'not-subscribed');
     } catch {
@@ -57,19 +58,28 @@ export class PushService {
         this.http.get<{ publicKey: string }>(`${this.base}/api/v1/push/vapid-key`)
       );
 
-      const reg = await navigator.serviceWorker.ready;
+      const reg = await this.registerSW();
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicKey)
       });
 
-      const json = sub.toJSON();
+      const json    = sub.toJSON();
+      const device  = this.deviceName();
+
       await lastValueFrom(
         this.http.post(`${this.base}/api/v1/push/subscribe`, {
           endpoint:   sub.endpoint,
           p256dh:     json.keys?.['p256dh'],
           auth:       json.keys?.['auth'],
-          deviceName: this.deviceName()
+          deviceName: device
+        })
+      );
+
+      await lastValueFrom(
+        this.http.post(`${this.base}/api/v1/alerts/config`, {
+          type:        'PUSH',
+          destination: device
         })
       );
 
@@ -86,8 +96,8 @@ export class PushService {
   async unsubscribe(): Promise<void> {
     if (!this.supported) return;
     try {
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.getSubscription();
+      const reg = await this.getRegistration();
+      const sub = reg ? await reg.pushManager.getSubscription() : null;
       if (!sub) { this.status.set('not-subscribed'); return; }
 
       await lastValueFrom(
@@ -101,6 +111,20 @@ export class PushService {
     } catch {
       throw new Error('Falha ao desativar notificações push.');
     }
+  }
+
+  /** Registra o SW se ainda não estiver registrado e aguarda ficar ativo. */
+  private async registerSW(): Promise<ServiceWorkerRegistration> {
+    const existing = await navigator.serviceWorker.getRegistration('/sw.js');
+    if (!existing) {
+      await navigator.serviceWorker.register('/sw.js');
+    }
+    return navigator.serviceWorker.ready;
+  }
+
+  /** Retorna o registration existente sem registrar um novo. */
+  private async getRegistration(): Promise<ServiceWorkerRegistration | undefined> {
+    return navigator.serviceWorker.getRegistration('/sw.js');
   }
 
   private initialStatus(): PushStatus {
