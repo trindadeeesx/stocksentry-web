@@ -1,11 +1,17 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../core/services/auth.service';
 import { AlertService } from '../../core/services/alert.service';
-import { SettingsService } from '../../core/services/settings.service';
+import { PushService } from '../../core/services/push.service';
+import { SettingsService, ToastPosition } from '../../core/services/settings.service';
+import { ToastService } from '../../core/services/toast.service';
+import { ThemeService } from '../../core/services/theme.service';
 import { AlertConfigResponse, AlertConfigRequest } from '../../core/models/alert.model';
 import { MeResponse } from '../../core/models/auth.model';
 import { TopbarComponent } from '../../shared/components/topbar/topbar.component';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 @Component({
   selector: 'app-settings',
@@ -18,7 +24,11 @@ import { TopbarComponent } from '../../shared/components/topbar/topbar.component
 export class SettingsComponent implements OnInit {
   private readonly authService    = inject(AuthService);
   private readonly alertService   = inject(AlertService);
+  private readonly toast          = inject(ToastService);
+  private readonly destroyRef     = inject(DestroyRef);
   readonly settingsService        = inject(SettingsService);
+  readonly themeService           = inject(ThemeService);
+  readonly pushService            = inject(PushService);
 
   // ── Conta ────────────────────────────────────────
   readonly currentUser   = signal<MeResponse | null>(null);
@@ -26,64 +36,116 @@ export class SettingsComponent implements OnInit {
 
   // ── Sincronização ────────────────────────────────
   selectedInterval       = this.settingsService.syncIntervalMs();
-  readonly syncSaved     = signal(false);
+
+  // ── Toast position ───────────────────────────────
+  selectedPosition: ToastPosition = this.settingsService.toastPosition();
 
   // ── Configs de alerta ────────────────────────────
   readonly alertConfigs  = signal<AlertConfigResponse[]>([]);
   readonly configLoading = signal(true);
-  readonly configSaving  = signal(false);
-  readonly configError   = signal('');
+  readonly configSaving   = signal(false);
+  readonly savingInterval = signal(false);
 
   newType: 'EMAIL' | 'PUSH' = 'EMAIL';
   newDest = '';
 
   ngOnInit(): void {
-    this.authService.fetchMe().subscribe({
+    this.pushService.init();
+
+    this.authService.fetchMe().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: user => { this.currentUser.set(user); this.userLoading.set(false); },
       error: ()   => this.userLoading.set(false)
     });
 
-    this.alertService.getConfig().subscribe({
+    this.alertService.getConfig().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: configs => { this.alertConfigs.set(configs); this.configLoading.set(false); },
       error: ()      => this.configLoading.set(false)
     });
   }
 
+  setTheme(theme: 'light' | 'dark'): void {
+    this.themeService.setTheme(theme);
+  }
+
   saveSyncInterval(): void {
-    this.settingsService.update({ syncIntervalMs: this.selectedInterval });
-    this.syncSaved.set(true);
-    setTimeout(() => this.syncSaved.set(false), 3000);
+    if (this.savingInterval()) return;
+    this.savingInterval.set(true);
+    this.settingsService.saveSyncInterval(this.selectedInterval).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        this.savingInterval.set(false);
+        this.toast.success('Intervalo de sync salvo. Polling atualizado.');
+      },
+      error: () => {
+        this.savingInterval.set(false);
+        this.toast.error('Erro ao salvar intervalo de sync.');
+      }
+    });
+  }
+
+  saveToastPosition(): void {
+    this.settingsService.update({ toastPosition: this.selectedPosition });
+    this.toast.info('Posição das notificações atualizada.');
   }
 
   addConfig(): void {
     const dest = this.newDest.trim();
     if (!dest || this.configSaving()) return;
 
-    this.configError.set('');
-    this.configSaving.set(true);
+    if (this.newType === 'EMAIL' && !EMAIL_RE.test(dest)) {
+      this.toast.error('Endereço de e-mail inválido.');
+      return;
+    }
 
+    this.configSaving.set(true);
     const body: AlertConfigRequest = { type: this.newType, destination: dest };
     this.alertService.addConfig(body).subscribe({
       next: created => {
         this.alertConfigs.update(list => [...list, created]);
         this.newDest = '';
         this.configSaving.set(false);
+        this.toast.success('Canal de alerta adicionado.');
       },
       error: () => {
-        this.configError.set('Erro ao adicionar configuração.');
         this.configSaving.set(false);
+        this.toast.error('Erro ao adicionar configuração.');
       }
     });
   }
 
-  deleteConfig(id: string): void {
+  deleteConfig(id: string, destination: string): void {
+    if (!confirm(`Remover o canal "${destination}"?`)) return;
     this.alertService.deleteConfig(id).subscribe({
-      next: () => this.alertConfigs.update(list => list.filter(c => c.id !== id)),
-      error: () => this.configError.set('Erro ao remover configuração.')
+      next: () => {
+        this.alertConfigs.update(list => list.filter(c => c.id !== id));
+        this.toast.info('Canal removido.');
+      },
+      error: () => this.toast.error('Erro ao remover configuração.')
+    });
+  }
+
+  enablePush(): void {
+    this.pushService.subscribe().then(() => {
+      this.toast.success('Notificações push ativadas neste dispositivo.');
+    }).catch(() => {
+      const s = this.pushService.status();
+      if (s === 'denied') {
+        this.toast.error('Permissão negada. Habilite notificações nas configurações do navegador.');
+      } else {
+        this.toast.error('Não foi possível ativar as notificações push.');
+      }
+    });
+  }
+
+  disablePush(): void {
+    this.pushService.unsubscribe().then(() => {
+      this.toast.info('Notificações push desativadas neste dispositivo.');
+    }).catch(() => {
+      this.toast.error('Erro ao desativar notificações push.');
     });
   }
 
   logout(): void {
-    this.authService.logout();
+    this.toast.info('Sessão encerrada.');
+    setTimeout(() => this.authService.logout(), 600);
   }
 }

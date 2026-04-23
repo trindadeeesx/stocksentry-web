@@ -58,6 +58,11 @@
           "defaultConfiguration": "production"
         },
         "serve": {
+          "options": {
+            "allowedHosts": [
+              "bernita-napless-datedly.ngrok-free.dev"
+            ]
+          },
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {

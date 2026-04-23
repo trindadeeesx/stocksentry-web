@@ -8,6 +8,44 @@
 
     <div class="settings-grid">
 
+      <!-- ── Aparência ──────────────────────────────── -->
+      <section class="card">
+        <div class="card__header">
+          <h2 class="card__title">Aparência</h2>
+          <p class="card__desc">Escolha o tema da interface.</p>
+        </div>
+        <div class="card__body">
+          <div class="theme-options">
+            <button
+              class="theme-opt"
+              [class.theme-opt--active]="themeService.theme() === 'light'"
+              (click)="setTheme('light')"
+              aria-label="Tema claro"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="5"/>
+                <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+              </svg>
+              Claro
+            </button>
+            <button
+              class="theme-opt"
+              [class.theme-opt--active]="themeService.theme() === 'dark'"
+              (click)="setTheme('dark')"
+              aria-label="Tema escuro"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+              </svg>
+              Escuro
+            </button>
+          </div>
+        </div>
+      </section>
+
       <!-- ── Sincronização ──────────────────────────────── -->
       <section class="card">
         <div class="card__header">
@@ -33,12 +71,9 @@
           </div>
 
           <div class="form-actions">
-            <button class="btn-primary" (click)="saveSyncInterval()">
-              Salvar intervalo
+            <button class="btn-primary" (click)="saveSyncInterval()" [disabled]="savingInterval()">
+              {{ savingInterval() ? 'Salvando...' : 'Salvar intervalo' }}
             </button>
-            @if (syncSaved()) {
-              <span class="feedback feedback--success">Salvo. Polling atualizado.</span>
-            }
           </div>
         </div>
       </section>
@@ -72,8 +107,8 @@
                   <span class="config-dest">{{ c.destination }}</span>
                   <button
                     class="btn-delete"
-                    (click)="deleteConfig(c.id)"
-                    title="Remover"
+                    (click)="deleteConfig(c.id, c.destination)"
+                    title="Remover canal"
                     aria-label="Remover canal {{ c.destination }}"
                   >✕</button>
                 </li>
@@ -98,9 +133,91 @@
             </button>
           </div>
 
-          @if (configError()) {
-            <p class="error-msg">{{ configError() }}</p>
+        </div>
+      </section>
+
+      <!-- ── Push Notifications ───────────────────────────── -->
+      <section class="card">
+        <div class="card__header">
+          <h2 class="card__title">Notificações push</h2>
+          <p class="card__desc">
+            Receba alertas de estoque diretamente neste dispositivo, mesmo com o navegador em segundo plano.
+          </p>
+        </div>
+
+        <div class="card__body">
+          @switch (pushService.status()) {
+
+            @case ('unsupported') {
+              <p class="push-status push-status--warn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                Seu navegador não suporta notificações push.
+              </p>
+            }
+
+            @case ('denied') {
+              <p class="push-status push-status--error">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                Permissão negada. Para ativar, clique no ícone de cadeado na barra de endereço e permita notificações.
+              </p>
+            }
+
+            @case ('subscribed') {
+              <div class="push-active">
+                <span class="push-indicator">
+                  <span class="push-dot"></span>
+                  Ativo neste dispositivo
+                </span>
+                <button class="btn-danger btn-danger--sm" (click)="disablePush()">
+                  Desativar
+                </button>
+              </div>
+            }
+
+            @case ('subscribing') {
+              <button class="btn-primary" disabled>
+                <span class="spinner spinner--sm" aria-hidden="true"></span>
+                Ativando...
+              </button>
+            }
+
+            @default {
+              <button class="btn-primary" (click)="enablePush()">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                Ativar notificações push
+              </button>
+            }
+
           }
+        </div>
+      </section>
+
+      <!-- ── Notificações ─────────────────────────────────── -->
+      <section class="card">
+        <div class="card__header">
+          <h2 class="card__title">Notificações na tela</h2>
+          <p class="card__desc">Posição onde os avisos aparecem.</p>
+        </div>
+
+        <div class="card__body">
+          <div class="form-row">
+            <label class="form-label" for="toast-pos">Posição</label>
+            <select
+              id="toast-pos"
+              class="form-select"
+              [(ngModel)]="selectedPosition"
+            >
+              @for (opt of settingsService.positionOptions; track opt.value) {
+                <option [value]="opt.value">{{ opt.label }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn-primary" (click)="saveToastPosition()">
+              Salvar posição
+            </button>
+          </div>
         </div>
       </section>
 
@@ -118,15 +235,20 @@
             </div>
           } @else if (currentUser()) {
             <div class="user-info">
-              <p class="user-name">{{ currentUser()!.name || currentUser()!.email }}</p>
-              <p class="user-email">{{ currentUser()!.email }}</p>
-              <p class="user-role">
-                <span class="role-chip">{{ currentUser()!.role }}</span>
-              </p>
+              <div class="user-avatar" aria-hidden="true">
+                {{ (currentUser()!.name || currentUser()!.email).charAt(0).toUpperCase() }}
+              </div>
+              <div class="user-details">
+                <p class="user-name">{{ currentUser()!.name || currentUser()!.email }}</p>
+                <p class="user-email">{{ currentUser()!.email }}</p>
+                <p class="user-role">
+                  <span class="role-chip">{{ currentUser()!.role }}</span>
+                </p>
+              </div>
             </div>
           }
 
-          <div class="form-actions" style="margin-top: 20px">
+          <div class="form-actions danger-zone">
             <button class="btn-danger" (click)="logout()">Encerrar sessão</button>
           </div>
         </div>

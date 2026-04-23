@@ -22,10 +22,10 @@
 }
 
 .page-title {
-  font-size: 1.25rem;
+  font-size: 1.375rem;
   font-weight: 700;
-  color: var(--color-primary);
-  letter-spacing: -.02em;
+  color: var(--color-text);
+  letter-spacing: -.025em;
   margin: 0;
 }
 
@@ -37,7 +37,7 @@
 }
 
 .filter-btn {
-  padding: 7px var(--spacing-md);
+  padding: 8px var(--spacing-md);
   font-size: .8125rem;
   font-weight: 500;
   color: var(--color-text-muted);
@@ -57,6 +57,9 @@
 .table-section {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
 }
 
 .data-table {
@@ -71,22 +74,24 @@
     font-weight: 600;
     color: var(--color-text-muted);
     text-transform: uppercase;
-    letter-spacing: .04em;
+    letter-spacing: .06em;
     border-bottom: 1px solid var(--color-border);
+    background: var(--color-bg);
   }
 
   td {
-    padding: 9px var(--spacing-md);
-    border-bottom: 1px solid #f0f0f2;
+    padding: 10px var(--spacing-md);
+    border-bottom: 1px solid var(--color-border-subtle);
     vertical-align: middle;
   }
 
   tbody tr:last-child td { border-bottom: none; }
-  tbody tr:hover { background: #fafafa; }
+  tbody tr:hover { background: var(--color-surface-hover); }
 }
 
 .td-name {
   font-weight: 500;
+  color: var(--color-text);
   max-width: 240px;
   white-space: nowrap;
   overflow: hidden;
@@ -95,7 +100,7 @@
 
 .td-mono {
   color: var(--color-text-muted);
-  font-family: monospace;
+  font-family: ui-monospace, 'SFMono-Regular', monospace;
   font-size: .75rem;
 }
 
@@ -105,28 +110,29 @@
 /* ── Stock chip ── */
 .stock-chip {
   display: inline-block;
-  padding: 2px 7px;
-  border-radius: 2px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
   font-size: .75rem;
   font-weight: 600;
-  background: rgba(22,163,74,.1);
+  background: rgba(22,163,74,.10);
   color: var(--color-success);
 
-  &--warn { background: rgba(217,119,6,.1); color: var(--color-warning); }
-  &--zero { background: rgba(192,57,43,.1); color: var(--color-danger); }
+  &--warn { background: rgba(217,119,6,.10); color: var(--color-warning); }
+  &--zero { background: rgba(192,57,43,.10); color: var(--color-danger); }
 }
 
 /* ── Status chip ── */
 .status-chip {
   display: inline-block;
-  padding: 2px 7px;
-  border-radius: 2px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
   font-size: .6875rem;
   font-weight: 700;
+  letter-spacing: .02em;
 
-  &--ok       { background: rgba(22,163,74,.1);  color: var(--color-success); }
-  &--critical { background: rgba(217,119,6,.1);  color: var(--color-warning); }
-  &--zero     { background: rgba(192,57,43,.1);  color: var(--color-danger);  }
+  &--ok       { background: rgba(22,163,74,.10);  color: var(--color-success); }
+  &--critical { background: rgba(217,119,6,.10);  color: var(--color-warning); }
+  &--zero     { background: rgba(192,57,43,.10);  color: var(--color-danger);  }
 }
 
 /* ── Inline edit ── */
@@ -137,43 +143,45 @@
 }
 
 .edit-input {
-  width: 70px;
-  padding: 4px var(--spacing-xs);
-  border: 1px solid var(--color-brand);
+  width: 72px;
+  padding: 5px var(--spacing-xs);
+  border: 1.5px solid var(--color-brand);
   border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
   font-size: .8125rem;
   outline: none;
-  color: var(--color-text);
 
-  &:focus { box-shadow: 0 0 0 2px rgba(220,25,96,.12); }
+  &:focus { box-shadow: 0 0 0 3px rgba(220,25,96,.10); }
 }
 
 .btn-save {
-  padding: 4px 9px;
+  padding: 5px 10px;
   background: var(--color-brand);
   color: #fff;
   border-radius: var(--radius-sm);
   font-size: .75rem;
   font-weight: 600;
   transition: background .12s, opacity .12s;
+  box-shadow: 0 1px 3px rgba(220, 25, 96, .22);
 
-  &:disabled { opacity: .6; cursor: not-allowed; }
+  &:disabled { opacity: .6; cursor: not-allowed; box-shadow: none; }
   &:hover:not(:disabled) { background: #b8154f; }
 }
 
 .btn-cancel {
-  padding: 4px 7px;
+  padding: 5px 7px;
   color: var(--color-text-muted);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   font-size: .75rem;
-  transition: color .12s;
+  transition: color .12s, border-color .12s;
 
   &:hover { color: var(--color-danger); border-color: var(--color-danger); }
 }
 
 .btn-edit {
-  padding: 4px 9px;
+  padding: 5px 10px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   font-size: .75rem;
@@ -189,6 +197,7 @@
   padding: var(--spacing-xl) var(--spacing-lg);
   color: var(--color-text-muted);
   font-size: .875rem;
+  text-align: center;
 }
 
 /* ── Pagination ── */
@@ -199,7 +208,7 @@
 }
 
 .page-btn {
-  padding: 5px 10px;
+  padding: 6px 11px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   font-size: .8125rem;

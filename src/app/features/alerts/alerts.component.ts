@@ -1,5 +1,7 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AlertService } from '../../core/services/alert.service';
+import { ToastService } from '../../core/services/toast.service';
 import { AlertResponse, AlertStatus, AlertType } from '../../core/models/alert.model';
 import { TopbarComponent } from '../../shared/components/topbar/topbar.component';
 import { BrDatePipe } from '../../shared/pipes/br-date.pipe';
@@ -15,6 +17,8 @@ type Filter = 'all' | AlertStatus | AlertType;
 })
 export class AlertsComponent implements OnInit {
   private readonly alertService = inject(AlertService);
+  private readonly toast        = inject(ToastService);
+  private readonly destroyRef   = inject(DestroyRef);
 
   readonly loading     = signal(true);
   readonly rows        = signal<AlertResponse[]>([]);
@@ -22,8 +26,7 @@ export class AlertsComponent implements OnInit {
   readonly currentPage = signal(0);
   readonly filter      = signal<Filter>('all');
 
-  readonly reportLoading  = signal(false);
-  readonly reportFeedback = signal('');
+  readonly reportLoading = signal(false);
 
   readonly filtered = computed(() => {
     const f = this.filter();
@@ -32,39 +35,40 @@ export class AlertsComponent implements OnInit {
     return list.filter(r => r.status === f || r.type === f);
   });
 
-  ngOnInit(): void {
-    this.loadPage(0);
-  }
+  ngOnInit(): void { this.loadPage(0); }
 
   loadPage(page: number): void {
     this.loading.set(true);
-    this.alertService.getHistory(page).subscribe({
+    this.alertService.getHistory(page).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: res => {
         this.rows.set(res.content);
         this.totalPages.set(res.totalPages);
         this.currentPage.set(res.number);
         this.loading.set(false);
       },
-      error: () => this.loading.set(false)
+      error: () => {
+        this.loading.set(false);
+        this.toast.error('Erro ao carregar histórico de alertas.');
+      }
     });
   }
 
-  setFilter(f: Filter): void { this.filter.set(f); }
+  setFilter(f: Filter): void {
+    this.filter.set(f);
+    this.loadPage(0);
+  }
 
   generateReport(days: 7 | 30): void {
     if (this.reportLoading()) return;
     this.reportLoading.set(true);
-    this.reportFeedback.set('');
-    this.alertService.generateReport(days).subscribe({
+    this.alertService.generateReport(days).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: res => {
-        this.reportFeedback.set(res.message);
         this.reportLoading.set(false);
-        setTimeout(() => this.reportFeedback.set(''), 5000);
+        this.toast.success(res.message);
       },
       error: () => {
-        this.reportFeedback.set('Erro ao gerar relatório.');
         this.reportLoading.set(false);
-        setTimeout(() => this.reportFeedback.set(''), 5000);
+        this.toast.error('Erro ao gerar relatório.');
       }
     });
   }

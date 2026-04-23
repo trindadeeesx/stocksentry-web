@@ -5,6 +5,7 @@ import { catchError, forkJoin, interval, of, switchMap, tap } from 'rxjs';
 import { SyncService } from '../../core/services/sync.service';
 import { ProductService } from '../../core/services/product.service';
 import { SettingsService } from '../../core/services/settings.service';
+import { ToastService } from '../../core/services/toast.service';
 import { SyncStatusResponse } from '../../core/models/sync.model';
 import { ProductResponse } from '../../core/models/product.model';
 import { TopbarComponent } from '../../shared/components/topbar/topbar.component';
@@ -19,32 +20,33 @@ import { BrDatePipe } from '../../shared/pipes/br-date.pipe';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class DashboardComponent implements OnInit {
-  private readonly syncService    = inject(SyncService);
-  private readonly productService = inject(ProductService);
+  private readonly syncService     = inject(SyncService);
+  private readonly productService  = inject(ProductService);
   private readonly settingsService = inject(SettingsService);
-  private readonly destroyRef     = inject(DestroyRef);
+  private readonly toast           = inject(ToastService);
+  private readonly destroyRef      = inject(DestroyRef);
 
-  // reactive stream — emits whenever the saved interval changes
   private readonly interval$ = toObservable(this.settingsService.syncIntervalMs);
 
-  readonly syncStatus      = signal<SyncStatusResponse | null>(null);
+  readonly syncStatus       = signal<SyncStatusResponse | null>(null);
   readonly criticalProducts = signal<ProductResponse[]>([]);
-  readonly outOfStock      = signal<ProductResponse[]>([]);
-  readonly loading         = signal(true);
-  readonly syncing         = signal(false);
-  readonly syncFeedback    = signal<'success' | 'error' | null>(null);
-  readonly syncIntervalLabel = this.settingsService.labelFor;
+  readonly outOfStock       = signal<ProductResponse[]>([]);
+  readonly loading          = signal(true);
+  readonly syncing          = signal(false);
 
   ngOnInit(): void {
-    // Sync imediato ao entrar
+    this.settingsService.loadFromBackend().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
+
     this.syncing.set(true);
     this.syncService.syncNow().pipe(
-      catchError(() => of(null)),
+      catchError(() => {
+        this.toast.error('Falha ao sincronizar na entrada.');
+        return of(null);
+      }),
       switchMap(() => this.fetchAll()),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
 
-    // Polling reativo — reinicia automaticamente se o intervalo mudar nas configurações
     this.interval$.pipe(
       switchMap(ms => interval(ms)),
       switchMap(() => this.fetchAll()),
@@ -76,26 +78,20 @@ export class DashboardComponent implements OnInit {
   forceSync(): void {
     if (this.syncing()) return;
     this.syncing.set(true);
-    this.syncFeedback.set(null);
 
     this.syncService.syncNow().pipe(
       catchError(() => of(null)),
       switchMap(() => this.fetchAll())
     ).subscribe({
-      next: () => {
-        this.syncFeedback.set('success');
-        setTimeout(() => this.syncFeedback.set(null), 4000);
+      next: (result) => {
+        if (result) this.toast.success('Sync concluída com sucesso.');
+        else        this.toast.error('Falha ao atualizar dados. Tente novamente.');
       },
       error: () => {
-        this.syncFeedback.set('error');
         this.syncing.set(false);
-        setTimeout(() => this.syncFeedback.set(null), 4000);
+        this.toast.error('Falha ao sincronizar. Tente novamente.');
       }
     });
-  }
-
-  get currentIntervalLabel(): string {
-    return this.settingsService.labelFor(this.settingsService.syncIntervalMs());
   }
 
   stockLabel(p: ProductResponse): string {

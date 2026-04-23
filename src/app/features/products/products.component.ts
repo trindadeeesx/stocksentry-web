@@ -1,6 +1,8 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ProductService } from '../../core/services/product.service';
+import { ToastService } from '../../core/services/toast.service';
 import { ProductResponse } from '../../core/models/product.model';
 import { TopbarComponent } from '../../shared/components/topbar/topbar.component';
 
@@ -11,10 +13,13 @@ type Filter = 'all' | 'critical' | 'outofstock';
   standalone: true,
   imports: [TopbarComponent, FormsModule],
   templateUrl: './products.component.html',
-  styleUrl: './products.component.scss'
+  styleUrl: './products.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ProductsComponent implements OnInit {
   private readonly productService = inject(ProductService);
+  private readonly toast          = inject(ToastService);
+  private readonly destroyRef     = inject(DestroyRef);
 
   readonly loading     = signal(true);
   readonly rows        = signal<ProductResponse[]>([]);
@@ -33,23 +38,23 @@ export class ProductsComponent implements OnInit {
     this.loading.set(true);
 
     if (f === 'critical') {
-      this.productService.getCritical().subscribe({
+      this.productService.getCritical().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: list => { this.rows.set(list); this.totalPages.set(0); this.loading.set(false); },
-        error: () => this.loading.set(false)
+        error: () => { this.loading.set(false); this.toast.error('Erro ao carregar produtos críticos.'); }
       });
     } else if (f === 'outofstock') {
-      this.productService.getOutOfStock().subscribe({
+      this.productService.getOutOfStock().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: list => { this.rows.set(list); this.totalPages.set(0); this.loading.set(false); },
-        error: () => this.loading.set(false)
+        error: () => { this.loading.set(false); this.toast.error('Erro ao carregar produtos zerados.'); }
       });
     } else {
-      this.productService.getAll(this.currentPage()).subscribe({
+      this.productService.getAll(this.currentPage()).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: res => {
           this.rows.set(res.content);
           this.totalPages.set(res.totalPages);
           this.loading.set(false);
         },
-        error: () => this.loading.set(false)
+        error: () => { this.loading.set(false); this.toast.error('Erro ao carregar produtos.'); }
       });
     }
   }
@@ -62,6 +67,7 @@ export class ProductsComponent implements OnInit {
   }
 
   goToPage(p: number): void {
+    if (p < 0 || p >= this.totalPages()) return;
     this.currentPage.set(p);
     this.load();
   }
@@ -75,14 +81,23 @@ export class ProductsComponent implements OnInit {
 
   saveEdit(p: ProductResponse): void {
     if (this.saving()) return;
+    const val = this.editingValue();
+    if (val < 0) {
+      this.toast.error('Estoque mínimo não pode ser negativo.');
+      return;
+    }
     this.saving.set(true);
-    this.productService.updateMinStock(p.id, this.editingValue()).subscribe({
+    this.productService.updateMinStock(p.id, val).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: updated => {
         this.rows.update(list => list.map(r => r.id === updated.id ? updated : r));
         this.editingId.set(null);
         this.saving.set(false);
+        this.toast.success('Estoque mínimo atualizado.');
       },
-      error: () => this.saving.set(false)
+      error: () => {
+        this.saving.set(false);
+        this.toast.error('Erro ao salvar estoque mínimo.');
+      }
     });
   }
 

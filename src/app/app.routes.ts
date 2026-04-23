@@ -4,6 +4,7 @@ import { authGuard } from './core/guards/auth.guard';
 export const routes: Routes = [
   {
     path: 'login',
+    title: 'Entrar — Meiliy Cosméticos',
     loadComponent: () => import('./features/login/login.component').then(m => m.LoginComponent)
   },
   {
@@ -33,5 +34,10 @@ export const routes: Routes = [
       }
     ]
   },
-  { path: '**', redirectTo: 'dashboard' }
+  {
+    path: '404',
+    title: 'Não encontrado — Meiliy Cosméticos',
+    loadComponent: () => import('./features/not-found/not-found.component').then(m => m.NotFoundComponent)
+  },
+  { path: '**', redirectTo: '404' }
 ];
