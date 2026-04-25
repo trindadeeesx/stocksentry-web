@@ -9,16 +9,16 @@
 
 **StockSentry** é um painel administrativo de monitoramento de estoque em tempo real para a Meiliy Cosméticos. Usuário único: o dono da loja. O frontend é uma SPA Angular servida estáticamente; o backend é um Spring Boot rodando em `http://localhost:8080`.
 
-**Stack frontend:** Angular 19 · Standalone Components · Angular Signals · RxJS (apenas onde HttpClient exige) · SCSS puro com CSS custom properties · sem Tailwind, sem Bootstrap, sem Axios.
+**Stack frontend:** Angular 21 · Standalone Components · Angular Signals · RxJS (apenas onde HttpClient exige) · SCSS puro com CSS custom properties · Vitest para testes · sem Tailwind, sem Bootstrap, sem Axios.
 
 ---
 
 ## Comandos de desenvolvimento
 
 ```bash
-ng serve                                              # dev → http://localhost:4200
+ng serve                                              # dev → http://localhost:4200 (proxya /api → localhost:8080)
 ng build --configuration production                   # build de produção
-ng test --watch=false --browsers=ChromeHeadless       # testes (single run)
+npx vitest run                                        # testes (single run)
 ng lint
 ```
 
@@ -32,29 +32,31 @@ src/app/
     guards/         authGuard — CanActivateFn, checa token no localStorage
     interceptors/   authInterceptor (Bearer header), errorInterceptor (retry + 401 → /login)
     models/         interfaces TypeScript (sem classes): alert, auth, product, sync
-    services/       auth, product, alert, sync, settings, theme, toast
+    services/       auth, product, alert, sync, settings, theme, toast, sse, push
   features/
     login/          página de autenticação
-    dashboard/      visão geral + polling reativo
+    dashboard/      visão geral + polling reativo + painel debug PDV
     products/       listagem + edição inline de estoque mínimo
     alerts/         histórico de alertas + geração de relatório
     settings/       configurações da conta, sync, canais de alerta, UI
     not-found/      página 404
   shared/
     components/
-      topbar/       barra de navegação global
-      toast/        container de notificações
+      topbar/       barra de navegação global (desktop + mobile bottom nav)
+      toast/        container de notificações posicionável
     pipes/
       br-date       formata ISO 8601 → dd/MM/yyyy HH:mm (pt-BR)
 src/styles/
-  _variables.scss   CSS custom properties
+  _variables.scss   CSS custom properties (light + dark theme)
   _reset.scss
   _typography.scss
+  _skeleton.scss
   styles.scss
 src/environments/
-  environment.ts          apiUrl: 'http://localhost:8080'
+  environment.ts          apiUrl: '' (usa proxy em dev)
   environment.prod.ts     apiUrl: window.__env?.apiUrl ?? ''
 public/sw.js              service worker para Web Push
+proxy.conf.json           proxia /api → http://localhost:8080 em dev
 ```
 
 ---
@@ -64,6 +66,7 @@ public/sw.js              service worker para Web Push
 | Rota | Componente | Guard |
 |---|---|---|
 | `/login` | LoginComponent | — |
+| `/` | → redirect `/dashboard` | authGuard |
 | `/dashboard` | DashboardComponent | authGuard |
 | `/products` | ProductsComponent | authGuard |
 | `/alerts` | AlertsComponent | authGuard |
@@ -81,6 +84,27 @@ public/sw.js              service worker para Web Push
 - `authInterceptor` injeta `Authorization: Bearer <token>` em **todas** as requisições.
 - `errorInterceptor` faz retry automático (1x, delay 800ms) apenas para erros de rede/servidor (5xx). Erros 4xx não são retentados. Em caso de 401, limpa o token e redireciona para `/login`.
 - Login redireciona automaticamente para `/dashboard` se já houver token válido.
+- Ao fazer login, `AuthService` também chama `SseService.connect()`.
+
+---
+
+## Tempo real — SSE (Server-Sent Events)
+
+`SseService` abre um `EventSource` em `GET /api/v1/events?token={jwt}` logo após o login.
+
+**Tipos de evento:**
+
+| Tipo | Quem escuta | Ação |
+|---|---|---|
+| `sync` | DashboardComponent, ProductsComponent | Refaz fetch de dados imediatamente |
+| `alert` | AlertsComponent | Refaz fetch do histórico de alertas |
+| `config` | AppComponent, SettingsComponent | Sincroniza estado de push; SettingsComponent também recarrega configs |
+| `heartbeat` | — | Mantém conexão viva (ignorado pelos componentes) |
+
+- Reconecta automaticamente quando a aba volta a ser visível (`visibilitychange`).
+- O token é passado via query string (EventSource não suporta headers customizados).
+- `AppComponent` escuta `config` para chamar `PushService.syncWithConfigs()`.
+- `SettingsComponent` tem fallback de polling de 20s para `config` além do SSE.
 
 ---
 
@@ -109,18 +133,23 @@ public/sw.js              service worker para Web Push
 - Estados de skeleton loading em todos os elementos enquanto carrega
 - Empty states ("Tudo normal", "Nenhum produto com estoque zerado")
 - Botão **Forçar Sync** com spinner durante operação
+- **Painel debug PDV** (toggle): lista produtos do PDV com edição inline de estoque + botão de sync manual
 
-**Polling reativo:** ao entrar na página, dispara `POST /api/v1/sync/now` imediatamente, depois faz fetch dos dados. Intervalo de polling configurável via backend (padrão 5 min); quando o usuário altera nas Configurações, o dashboard reage sem precisar recarregar.
+**Polling reativo:** ao entrar na página, dispara `POST /api/v1/sync/now` imediatamente, depois faz fetch dos dados. Intervalo de polling configurável via backend (padrão 5 min); quando o usuário altera nas Configurações, o `interval$` do dashboard se recria automaticamente via `toObservable + switchMap`. SSE `sync` também dispara `fetchAll()`.
 
 **Ações do usuário:**
 - Clicar em **Forçar Sync** → `POST /api/v1/sync/now` + refresh dos dados
+- (Debug) Editar estoque de produto no PDV → `PATCH /api/v1/debug/pdv/products/{id}/stock`
+- (Debug) Sync manual pós-edição → `POST /api/v1/sync/now`
 
 **Endpoints consumidos:**
 - `POST /api/v1/sync/now`
 - `GET /api/v1/sync/status`
 - `GET /api/v1/products/critical`
 - `GET /api/v1/products/out-of-stock`
-- `GET /api/v1/settings` (ao entrar, para carregar o intervalo de polling salvo)
+- `GET /api/v1/settings` (ao entrar, para carregar o intervalo de polling)
+- `GET /api/v1/debug/pdv/products` (painel debug)
+- `PATCH /api/v1/debug/pdv/products/{id}/stock` — body: `{ "estoque": number }` (painel debug)
 
 ---
 
@@ -134,6 +163,8 @@ public/sw.js              service worker para Web Push
 - Edição inline de estoque mínimo: campo numérico + botões Salvar / Cancelar diretamente na linha
 - Paginação numérica (Anterior / páginas / Próxima) — apenas quando `filter = 'all'`
 - Skeleton loading (8 linhas) durante carregamento
+
+**Atualização em tempo real:** SSE `sync` dispara reload da lista atual.
 
 **Ações do usuário:**
 - Alternar filtro → recarrega lista do endpoint correspondente
@@ -161,6 +192,8 @@ public/sw.js              service worker para Web Push
 - Paginação numérica
 - Skeleton loading (8 linhas)
 - Empty state ("Nenhum alerta encontrado.")
+
+**Atualização em tempo real:** SSE `alert` dispara reload da página atual.
 
 **Ações do usuário:**
 - Alternar filtro → filtra localmente a página atual (sem nova requisição)
@@ -191,6 +224,12 @@ Dividida em 5 seções:
 - Formulário de adição: select Tipo (EMAIL / PUSH) + campo Destino + botão Adicionar
 - Validação de formato de e-mail no frontend antes de enviar
 - Toast de sucesso/erro para cada operação
+- SSE `config` + polling de 20s atualizam a lista automaticamente
+
+#### Push notifications
+- Exibe o status atual da subscrição push deste dispositivo
+- Botão **Ativar notificações** ou **Desativar** conforme o estado
+- Status possíveis: `unsupported` · `denied` · `not-subscribed` · `subscribing` · `subscribed`
 
 #### Notificações na tela
 - Select de posição do toast: 6 opções (superior/inferior × esquerda/centro/direita)
@@ -198,7 +237,7 @@ Dividida em 5 seções:
 
 #### Conta
 - Exibe nome, e-mail e role do usuário logado (avatar com inicial)
-- Botão **Encerrar sessão** → limpa token + redireciona para `/login`
+- Botão **Encerrar sessão** → limpa token + desconecta SSE + redireciona para `/login`
 
 **Endpoints consumidos:**
 - `GET /api/v1/auth/me`
@@ -344,6 +383,34 @@ DELETE /api/v1/push/subscribe?endpoint={url}
 204 No Content
 ```
 
+### SSE
+
+```
+GET /api/v1/events?token={jwt}      (auth via query string)
+Content-Type: text/event-stream
+
+Eventos: sync | alert | config | heartbeat
+```
+
+### Debug PDV (desenvolvimento)
+
+```
+GET /api/v1/debug/pdv/products
+200 OK: PdvProduct[]
+
+PATCH /api/v1/debug/pdv/products/{id}/stock
+Body:    { "estoque": number }
+200 OK: (qualquer body)
+
+PdvProduct: {
+  "id": number,
+  "codigo": string,
+  "nome": string,
+  "estoque": number,
+  "unidade": string
+}
+```
+
 ---
 
 ## Lógica de status de estoque
@@ -361,33 +428,48 @@ O campo `critical` retornado pelo backend deve espelhar `currentStock < minStock
 ## Comportamentos notáveis
 
 - **Polling reativo:** o intervalo de polling do dashboard é um signal derivado do backend. Alterar via Configurações → o `interval$` do dashboard se recria automaticamente via `toObservable + switchMap`, sem reload de página.
+- **SSE:** complementa o polling — qualquer evento `sync` do backend atualiza o dashboard imediatamente, independente do intervalo configurado.
 - **Skeleton loading:** todas as páginas exibem placeholders animados enquanto aguardam resposta do backend — nunca uma tela em branco.
 - **Toast system:** notificações posicionáveis (6 posições), máximo 5 simultâneos, auto-dismiss (4s success/info, 5s error), animação de entrada e saída.
 - **Dark mode:** persiste em `localStorage`, detecta `prefers-color-scheme` na primeira visita, aplica via `data-theme` no `<html>`.
 - **Retry automático:** erros de rede/servidor (5xx) são retentados 1 vez com delay de 800ms. Erros 4xx (incluindo 401) não são retentados.
 - **LocalStorage como cache:** o `syncIntervalMs` é cacheado localmente como fallback offline — o backend é a fonte de verdade, e o valor é atualizado ao abrir o dashboard.
+- **Push notifications:** `PushService` gerencia o ciclo de vida completo (pedir permissão, subscrever no navegador, registrar endpoint no backend, revogar). O nome do dispositivo é gerado e persistido em `localStorage`.
+- **Mobile:** topbar fixa no topo (desktop) + nav de ícones no rodapé fixo (mobile, 60px). `styles.scss` adiciona `padding-bottom` para compensar no conteúdo.
 
 ---
 
 ## Variáveis CSS (tokens de design)
 
 ```scss
-// Cores
---color-primary:    #2d3748   // topbar, elementos primários
---color-brand:      (rosa Meiliy)
---color-danger:     #e53e3e
---color-warning:    #dd6b20
---color-success:    #38a169
---color-bg:         #f7fafc   // fundo das páginas
---color-surface:    #ffffff   // cards, tabelas
+// Cores — modo claro
+--color-brand:          #DC1960   // rosa Meiliy
+--color-primary:        #020000   // topbar (preto absoluto, não muda com o tema)
+
+--color-danger:         #c0392b
+--color-warning:        #d97706
+--color-success:        #16a34a
+--color-info:           #2b6cb0
+
+--color-bg:             #f4f4f5   // fundo das páginas
+--color-surface:        #ffffff   // cards, tabelas
+--color-surface-hover:  #f5f5f7
+--color-border:         #e4e4e7
+--color-text:           #18181b
+--color-text-muted:     #71717a
 
 // Espaçamento
 --spacing-xs: 4px  |  --spacing-sm: 8px  |  --spacing-md: 16px
 --spacing-lg: 24px |  --spacing-xl: 32px
 
 // Bordas
---radius-sm  |  --radius-md  |  --radius-lg
+--radius-sm: 5px  |  --radius-md: 8px  |  --radius-lg: 12px
+
+// Sombras
+--shadow-sm  |  --shadow-md  |  --shadow-lg
 ```
+
+Tema escuro via `[data-theme="dark"]`: inverte surfaces, ajusta status colors e sombras. `--color-primary` e `--color-brand` **não mudam** com o tema.
 
 ---
 
@@ -396,7 +478,10 @@ O campo `critical` retornado pelo backend deve espelhar `currentStock < minStock
 - Sem Tailwind, sem Bootstrap — SCSS puro com custom properties
 - Sem Axios — `HttpClient` do Angular exclusivamente
 - `signal()` sobre `BehaviorSubject` sempre que possível
+- `ChangeDetectionStrategy.OnPush` em todos os componentes de feature
 - Todos os componentes são standalone (sem NgModules)
 - Rotas usam `loadComponent` (lazy loading)
 - Backend retorna datas em ISO 8601; frontend formata com `BrDatePipe` → `dd/MM/yyyy HH:mm`
 - Paginação Spring: `{ content, totalElements, totalPages, number, size }`
+- Em desenvolvimento, `proxy.conf.json` proxia `/api` para `localhost:8080` — `environment.apiUrl` é `''`
+- Em produção, `apiUrl` vem de `window.__env.apiUrl` injetado no HTML
