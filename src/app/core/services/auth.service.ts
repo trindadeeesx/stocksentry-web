@@ -4,18 +4,23 @@ import { Router } from '@angular/router';
 import { tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthResponse, LoginRequest, MeResponse } from '../models/auth.model';
+import { SseService } from './sse.service';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
+  private readonly sse = inject(SseService);
   private readonly base = environment.apiUrl;
 
   readonly currentUser = signal<MeResponse | null>(null);
 
   login(body: LoginRequest) {
     return this.http.post<AuthResponse>(`${this.base}/api/v1/auth/login`, body).pipe(
-      tap(res => localStorage.setItem('stocksentry_token', res.token))
+      tap(res => {
+        localStorage.setItem('stocksentry_token', res.token);
+        this.sse.connect();
+      })
     );
   }
 
@@ -26,6 +31,7 @@ export class AuthService {
   }
 
   logout(): void {
+    this.sse.disconnect();
     localStorage.removeItem('stocksentry_token');
     this.currentUser.set(null);
     this.router.navigate(['/login']);
