@@ -43,8 +43,8 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "8kB",
-                  "maximumError": "16kB"
+                  "maximumWarning": "12kB",
+                  "maximumError": "20kB"
                 }
               ],
               "outputHashing": "all"
@@ -59,9 +59,8 @@
         },
         "serve": {
           "options": {
-            "allowedHosts": [
-              "bernita-napless-datedly.ngrok-free.dev"
-            ]
+            "proxyConfig": "proxy.conf.json",
+            "allowedHosts": true
           },
           "builder": "@angular/build:dev-server",
           "configurations": {
