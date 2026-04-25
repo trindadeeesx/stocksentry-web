@@ -157,6 +157,9 @@
 
 /* ── Buttons ── */
 .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   padding: 8px var(--spacing-md);
   background: var(--color-brand);
   color: #fff;
@@ -167,6 +170,8 @@
   transition: background .12s, opacity .12s, box-shadow .12s;
   box-shadow: 0 1px 4px rgba(220, 25, 96, .24);
   white-space: nowrap;
+
+  svg { flex-shrink: 0; }
 
   &:hover:not(:disabled) { background: #b8154f; box-shadow: 0 2px 8px rgba(220, 25, 96, .34); }
   &:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
@@ -324,6 +329,39 @@
   font-size: .875rem;
   color: var(--color-text-muted);
   margin: 0;
+}
+
+/* ── Mobile ── */
+@media (max-width: 768px) {
+  .content { padding: var(--spacing-md); gap: var(--spacing-md); }
+  .card__body { padding: var(--spacing-md); }
+  .card__header { padding: var(--spacing-md); }
+
+  .form-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+  }
+
+  .form-label { min-width: unset; }
+  .form-select { width: 100%; }
+
+  .add-form {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  .form-select--sm { width: 100%; }
+  .form-input { width: 100%; }
+  .add-form .btn-primary { width: 100%; justify-content: center; }
+
+  .theme-options { gap: var(--spacing-xs); }
+  .theme-opt { flex: 1; justify-content: center; }
+}
+
+@media (max-width: 480px) {
+  .page-title { font-size: 1.125rem; }
+  .push-status { font-size: .8125rem; }
 }
 
 /* ── User info ── */

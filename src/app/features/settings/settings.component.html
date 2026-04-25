@@ -104,7 +104,7 @@
               @for (c of alertConfigs(); track c.id) {
                 <li class="config-item">
                   <span class="type-chip type-chip--{{ c.type.toLowerCase() }}">{{ c.type }}</span>
-                  <span class="config-dest">{{ c.destination }}</span>
+                  <span class="config-dest">{{ pushConfigLabel(c, alertConfigs()) }}</span>
                   <button
                     class="btn-delete"
                     (click)="deleteConfig(c.id, c.destination)"
