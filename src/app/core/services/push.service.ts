@@ -28,6 +28,11 @@ export class PushService {
 
   readonly status = signal<PushStatus>(this.initialStatus());
 
+  /** Nome do dispositivo inscrito neste browser, salvo em localStorage. */
+  get localDeviceName(): string | null {
+    return localStorage.getItem('stocksentry_push_device');
+  }
+
   /** Checa se já há uma subscription ativa e atualiza o signal. */
   async init(): Promise<void> {
     if (!this.supported || this.status() === 'unsupported' || this.status() === 'denied') return;
@@ -36,6 +41,32 @@ export class PushService {
       if (!reg) { this.status.set('not-subscribed'); return; }
       const sub = await reg.pushManager.getSubscription();
       this.status.set(sub ? 'subscribed' : 'not-subscribed');
+    } catch {
+      this.status.set('not-subscribed');
+    }
+  }
+
+  /**
+   * Chamado após carregar os configs do backend.
+   * Se o browser está "subscribed" mas o config deste dispositivo
+   * foi removido remotamente, limpa o estado local silenciosamente.
+   */
+  async syncWithConfigs(configs: { type: string; destination: string; active: boolean }[]): Promise<void> {
+    if (this.status() !== 'subscribed') return;
+
+    const localName = this.localDeviceName;
+    const stillRegistered = localName
+      ? configs.some(c => c.type === 'PUSH' && c.active && c.destination === localName)
+      : configs.some(c => c.type === 'PUSH' && c.active);
+
+    if (stillRegistered) return;
+
+    try {
+      const reg = await this.getRegistration();
+      const sub = reg ? await reg.pushManager.getSubscription() : null;
+      if (sub) await sub.unsubscribe();
+      localStorage.removeItem('stocksentry_push_device');
+      this.status.set('not-subscribed');
     } catch {
       this.status.set('not-subscribed');
     }
@@ -83,6 +114,9 @@ export class PushService {
         })
       );
 
+      // Salva localmente para identificar "este dispositivo" na lista de canais
+      localStorage.setItem('stocksentry_push_device', device);
+
       this.status.set('subscribed');
     } catch {
       // Se falhou depois de pedir permissão, preserva o estado de permissão real
@@ -102,11 +136,12 @@ export class PushService {
 
       await lastValueFrom(
         this.http.delete(`${this.base}/api/v1/push/subscribe`, {
-          params: { endpoint: sub.endpoint }
+          body: { endpoint: sub.endpoint }
         })
       );
 
       await sub.unsubscribe();
+      localStorage.removeItem('stocksentry_push_device');
       this.status.set('not-subscribed');
     } catch {
       throw new Error('Falha ao desativar notificações push.');
@@ -137,10 +172,27 @@ export class PushService {
 
   private deviceName(): string {
     const ua = navigator.userAgent;
-    if (/Chrome/.test(ua))  return 'Chrome';
-    if (/Firefox/.test(ua)) return 'Firefox';
-    if (/Safari/.test(ua))  return 'Safari';
-    if (/Edg/.test(ua))     return 'Edge';
-    return 'Navegador';
+
+    const isIPhone  = /iPhone/.test(ua);
+    const isIPad    = /iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    const isAndroid = /Android/.test(ua);
+
+    const isMobile = isIPhone || isIPad || isAndroid;
+
+    let browser = 'Navegador';
+    if (/Edg\//.test(ua))                        browser = 'Edge';
+    else if (/OPR\/|Opera/.test(ua))             browser = 'Opera';
+    else if (/CriOS\//.test(ua))                 browser = 'Chrome';
+    else if (/FxiOS\//.test(ua))                 browser = 'Firefox';
+    else if (/Chrome\//.test(ua))                browser = 'Chrome';
+    else if (/Firefox\//.test(ua))               browser = 'Firefox';
+    else if (/Safari\//.test(ua))                browser = 'Safari';
+
+    let device = '';
+    if (isIPhone)       device = 'iPhone';
+    else if (isIPad)    device = 'iPad';
+    else if (isAndroid) device = 'Android';
+
+    return device ? `${browser} • ${device}` : browser;
   }
 }
