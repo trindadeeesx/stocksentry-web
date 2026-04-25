@@ -2,3 +2,8 @@
 @use 'styles/reset';
 @use 'styles/typography';
 @use 'styles/skeleton';
+
+/* Mobile: espaço para a bottom nav fixa */
+@media (max-width: 640px) {
+  .layout { padding-bottom: 60px; }
+}
