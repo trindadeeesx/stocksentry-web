@@ -2,6 +2,7 @@ import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angula
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AlertService } from '../../core/services/alert.service';
 import { ToastService } from '../../core/services/toast.service';
+import { SseService } from '../../core/services/sse.service';
 import { AlertResponse, AlertStatus, AlertType } from '../../core/models/alert.model';
 import { TopbarComponent } from '../../shared/components/topbar/topbar.component';
 import { BrDatePipe } from '../../shared/pipes/br-date.pipe';
@@ -18,6 +19,7 @@ type Filter = 'all' | AlertStatus | AlertType;
 export class AlertsComponent implements OnInit {
   private readonly alertService = inject(AlertService);
   private readonly toast        = inject(ToastService);
+  private readonly sse          = inject(SseService);
   private readonly destroyRef   = inject(DestroyRef);
 
   readonly loading     = signal(true);
@@ -35,7 +37,14 @@ export class AlertsComponent implements OnInit {
     return list.filter(r => r.status === f || r.type === f);
   });
 
-  ngOnInit(): void { this.loadPage(0); }
+  ngOnInit(): void {
+    this.loadPage(0);
+
+    // SSE: novo alerta disparado → recarrega a página atual
+    this.sse.on('alert').pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      this.loadPage(this.currentPage());
+    });
+  }
 
   loadPage(page: number): void {
     this.loading.set(true);

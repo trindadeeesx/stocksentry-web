@@ -161,6 +161,35 @@
   text-align: center;
 }
 
+/* ── Mobile ── */
+@media (max-width: 768px) {
+  .content { padding: var(--spacing-md); gap: var(--spacing-md); }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+  }
+
+  .page-actions { width: 100%; }
+
+  .btn-outline { flex: 1; justify-content: center; text-align: center; }
+
+  .filters { flex-wrap: wrap; }
+
+  .table-section { overflow-x: auto; }
+
+  .data-table {
+    min-width: 540px;
+  }
+
+  .pagination { flex-wrap: wrap; }
+}
+
+@media (max-width: 480px) {
+  .page-title { font-size: 1.125rem; }
+}
+
 /* ── Pagination ── */
 .pagination {
   display: flex;
