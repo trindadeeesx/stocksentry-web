@@ -1,8 +1,10 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
+import { switchMap } from 'rxjs';
 import { ProductService } from '../../core/services/product.service';
 import { ToastService } from '../../core/services/toast.service';
+import { SseService } from '../../core/services/sse.service';
 import { ProductResponse } from '../../core/models/product.model';
 import { TopbarComponent } from '../../shared/components/topbar/topbar.component';
 
@@ -19,6 +21,7 @@ type Filter = 'all' | 'critical' | 'outofstock';
 export class ProductsComponent implements OnInit {
   private readonly productService = inject(ProductService);
   private readonly toast          = inject(ToastService);
+  private readonly sse            = inject(SseService);
   private readonly destroyRef     = inject(DestroyRef);
 
   readonly loading     = signal(true);
@@ -31,7 +34,18 @@ export class ProductsComponent implements OnInit {
   readonly editingValue = signal(0);
   readonly saving       = signal(false);
 
-  ngOnInit(): void { this.load(); }
+  ngOnInit(): void {
+    this.load();
+
+    // SSE: recarrega lista quando uma sync é concluída no backend
+    this.sse.on('sync').pipe(
+      switchMap(() => {
+        this.load();
+        return [];
+      }),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
 
   load(): void {
     const f = this.filter();

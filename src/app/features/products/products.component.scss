@@ -200,6 +200,20 @@
   text-align: center;
 }
 
+/* ── Mobile ── */
+@media (max-width: 768px) {
+  .content { padding: var(--spacing-md); gap: var(--spacing-md); }
+  .table-section { overflow-x: auto; }
+}
+
+@media (max-width: 560px) {
+  .col-hide-sm { display: none; }
+  .td-name { max-width: 140px; }
+  .edit-inline { flex-wrap: wrap; gap: 4px; }
+  .edit-input { width: 60px; }
+  .page-title { font-size: 1.125rem; }
+}
+
 /* ── Pagination ── */
 .pagination {
   display: flex;
