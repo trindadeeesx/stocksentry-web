@@ -55,9 +55,9 @@
   font-weight: 600;
   letter-spacing: .02em;
   transition: background .12s, opacity .12s, box-shadow .12s;
-  box-shadow: 0 1px 4px rgba(220, 25, 96, .24);
+  box-shadow: 0 1px 4px rgba(var(--color-brand-rgb), .24);
 
-  &:hover:not(:disabled) { background: #b8154f; box-shadow: 0 2px 8px rgba(220, 25, 96, .34); }
+  &:hover:not(:disabled) { background: var(--color-brand-hover); box-shadow: 0 2px 8px rgba(var(--color-brand-rgb), .34); }
   &:disabled { opacity: .6; cursor: not-allowed; box-shadow: none; }
 }
 

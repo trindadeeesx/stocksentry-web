@@ -99,7 +99,7 @@
 
     &:focus {
       border-color: var(--color-brand);
-      box-shadow: 0 0 0 3px rgba(220, 25, 96, 0.10);
+      box-shadow: 0 0 0 3px rgba(var(--color-brand-rgb), 0.10);
       background: var(--color-surface);
     }
   }
@@ -129,11 +129,11 @@
   letter-spacing: 0.02em;
   margin-top: var(--spacing-xs);
   transition: background 0.12s, opacity 0.12s, box-shadow 0.12s;
-  box-shadow: 0 1px 4px rgba(220, 25, 96, 0.25);
+  box-shadow: 0 1px 4px rgba(var(--color-brand-rgb), 0.25);
 
   &:hover:not(:disabled) {
-    background: #b8154f;
-    box-shadow: 0 2px 8px rgba(220, 25, 96, 0.35);
+    background: var(--color-brand-hover);
+    box-shadow: 0 2px 8px rgba(var(--color-brand-rgb), 0.35);
   }
   &:disabled { opacity: 0.6; cursor: not-allowed; box-shadow: none; }
 }

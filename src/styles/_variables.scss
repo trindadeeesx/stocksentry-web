@@ -1,5 +1,7 @@
 :root {
-  --color-brand:          #DC1960;
+  --color-brand:          #0F766E;
+  --color-brand-hover:    #115E59;
+  --color-brand-rgb:      15, 118, 110;   /* para rgba(var(--color-brand-rgb), .x) */
   --color-primary:        #020000;   /* topbar bg — stays dark regardless of theme */
 
   --color-danger:         #c0392b;
