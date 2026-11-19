@@ -11,9 +11,9 @@ import { ThemeService } from '../../../core/services/theme.service';
   template: `
     <header class="topbar">
       <div class="topbar__brand">
-        <span class="topbar__logo" aria-hidden="true">M</span>
+        <span class="topbar__logo" aria-hidden="true">S</span>
         <div class="topbar__titles">
-          <span class="topbar__name">Meiliy Cosméticos</span>
+          <span class="topbar__name">StockSentry</span>
           <span class="topbar__module">Gestão de Estoque</span>
         </div>
       </div>
