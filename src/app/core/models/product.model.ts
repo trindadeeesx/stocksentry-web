@@ -12,10 +12,15 @@ export interface ProductResponse {
   createdAt: string;
 }
 
-export interface Page<T> {
-  content: T[];
+/** Metadados de paginação; o back manda aninhado em `page` (Spring PagedModel). */
+export interface PageMeta {
+  size: number;
+  number: number;
   totalElements: number;
   totalPages: number;
-  number: number;
-  size: number;
+}
+
+export interface Page<T> {
+  content: T[];
+  page: PageMeta;
 }

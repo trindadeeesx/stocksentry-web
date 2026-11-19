@@ -65,7 +65,7 @@ export class ProductsComponent implements OnInit {
       this.productService.getAll(this.currentPage()).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: res => {
           this.rows.set(res.content);
-          this.totalPages.set(res.totalPages);
+          this.totalPages.set(res.page.totalPages);
           this.loading.set(false);
         },
         error: () => { this.loading.set(false); this.toast.error('Erro ao carregar produtos.'); }

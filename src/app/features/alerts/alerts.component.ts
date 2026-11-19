@@ -51,8 +51,8 @@ export class AlertsComponent implements OnInit {
     this.alertService.getHistory(page).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: res => {
         this.rows.set(res.content);
-        this.totalPages.set(res.totalPages);
-        this.currentPage.set(res.number);
+        this.totalPages.set(res.page.totalPages);
+        this.currentPage.set(res.page.number);
         this.loading.set(false);
       },
       error: () => {
