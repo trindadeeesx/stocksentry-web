@@ -92,8 +92,8 @@
   &--active {
     border-color: var(--color-brand);
     color: var(--color-brand);
-    background: rgba(220, 25, 96, .06);
-    box-shadow: 0 0 0 3px rgba(220, 25, 96, .08);
+    background: rgba(var(--color-brand-rgb), .06);
+    box-shadow: 0 0 0 3px rgba(var(--color-brand-rgb), .08);
   }
 }
 
@@ -123,7 +123,7 @@
   cursor: pointer;
   transition: border-color .12s, box-shadow .12s;
 
-  &:focus { border-color: var(--color-brand); box-shadow: 0 0 0 3px rgba(220,25,96,.10); }
+  &:focus { border-color: var(--color-brand); box-shadow: 0 0 0 3px rgba(var(--color-brand-rgb), .10); }
 }
 
 .form-select--sm { width: 100px; flex-shrink: 0; }
@@ -140,7 +140,7 @@
   transition: border-color .12s, box-shadow .12s;
 
   &::placeholder { color: var(--color-text-muted); opacity: .7; }
-  &:focus { border-color: var(--color-brand); box-shadow: 0 0 0 3px rgba(220,25,96,.10); background: var(--color-surface); }
+  &:focus { border-color: var(--color-brand); box-shadow: 0 0 0 3px rgba(var(--color-brand-rgb), .10); background: var(--color-surface); }
 }
 
 .form-actions {
@@ -168,12 +168,12 @@
   font-weight: 600;
   letter-spacing: .02em;
   transition: background .12s, opacity .12s, box-shadow .12s;
-  box-shadow: 0 1px 4px rgba(220, 25, 96, .24);
+  box-shadow: 0 1px 4px rgba(var(--color-brand-rgb), .24);
   white-space: nowrap;
 
   svg { flex-shrink: 0; }
 
-  &:hover:not(:disabled) { background: #b8154f; box-shadow: 0 2px 8px rgba(220, 25, 96, .34); }
+  &:hover:not(:disabled) { background: var(--color-brand-hover); box-shadow: 0 2px 8px rgba(var(--color-brand-rgb), .34); }
   &:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
 }
 
@@ -377,7 +377,7 @@
   justify-content: center;
   width: 44px;
   height: 44px;
-  background: rgba(220, 25, 96, .10);
+  background: rgba(var(--color-brand-rgb), .10);
   color: var(--color-brand);
   border-radius: 50%;
   font-size: 1.125rem;
@@ -409,7 +409,7 @@
 .role-chip {
   display: inline-block;
   padding: 2px 8px;
-  background: rgba(220,25,96,.08);
+  background: rgba(var(--color-brand-rgb), .08);
   color: var(--color-brand);
   border-radius: var(--radius-sm);
   font-size: .6875rem;

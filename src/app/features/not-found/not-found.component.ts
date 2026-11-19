@@ -60,7 +60,7 @@ import { RouterLink } from '@angular/router';
       font-weight: 600;
       letter-spacing: .02em;
       transition: background .12s;
-      &:hover { background: #b8154f; }
+      &:hover { background: var(--color-brand-hover); }
     }
   `]
 })

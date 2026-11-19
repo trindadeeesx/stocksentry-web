@@ -152,7 +152,7 @@
   font-size: .8125rem;
   outline: none;
 
-  &:focus { box-shadow: 0 0 0 3px rgba(220,25,96,.10); }
+  &:focus { box-shadow: 0 0 0 3px rgba(var(--color-brand-rgb), .10); }
 }
 
 .btn-save {
@@ -163,10 +163,10 @@
   font-size: .75rem;
   font-weight: 600;
   transition: background .12s, opacity .12s;
-  box-shadow: 0 1px 3px rgba(220, 25, 96, .22);
+  box-shadow: 0 1px 3px rgba(var(--color-brand-rgb), .22);
 
   &:disabled { opacity: .6; cursor: not-allowed; box-shadow: none; }
-  &:hover:not(:disabled) { background: #b8154f; }
+  &:hover:not(:disabled) { background: var(--color-brand-hover); }
 }
 
 .btn-cancel {
