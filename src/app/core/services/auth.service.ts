@@ -1,9 +1,9 @@
 import { inject, Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { tap } from 'rxjs';
+import { map, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { AuthResponse, LoginRequest, MeResponse } from '../models/auth.model';
+import { AuthResponse, LoginRequest, MeEnvelope, MeResponse } from '../models/auth.model';
 import { SseService } from './sse.service';
 
 @Injectable({ providedIn: 'root' })
@@ -25,7 +25,8 @@ export class AuthService {
   }
 
   fetchMe() {
-    return this.http.get<MeResponse>(`${this.base}/api/v1/auth/me`).pipe(
+    return this.http.get<MeEnvelope>(`${this.base}/api/v1/auth/me`).pipe(
+      map(res => res.user),
       tap(user => this.currentUser.set(user))
     );
   }

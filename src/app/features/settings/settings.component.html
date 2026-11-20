@@ -46,38 +46,6 @@
         </div>
       </section>
 
-      <!-- ── Sincronização ──────────────────────────────── -->
-      <section class="card">
-        <div class="card__header">
-          <h2 class="card__title">Sincronização automática</h2>
-          <p class="card__desc">
-            Define com que frequência o sistema busca novos dados do estoque.
-            O Dashboard aplica a mudança imediatamente, sem precisar recarregar a página.
-          </p>
-        </div>
-
-        <div class="card__body">
-          <div class="form-row">
-            <label class="form-label" for="sync-interval">Intervalo de sync</label>
-            <select
-              id="sync-interval"
-              class="form-select"
-              [(ngModel)]="selectedInterval"
-            >
-              @for (opt of settingsService.intervalOptions; track opt.value) {
-                <option [value]="opt.value">{{ opt.label }}</option>
-              }
-            </select>
-          </div>
-
-          <div class="form-actions">
-            <button class="btn-primary" (click)="saveSyncInterval()" [disabled]="savingInterval()">
-              {{ savingInterval() ? 'Salvando...' : 'Salvar intervalo' }}
-            </button>
-          </div>
-        </div>
-      </section>
-
       <!-- ── Configs de alerta ──────────────────────────── -->
       <section class="card">
         <div class="card__header">

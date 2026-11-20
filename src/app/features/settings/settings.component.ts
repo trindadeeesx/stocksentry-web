@@ -37,17 +37,13 @@ export class SettingsComponent implements OnInit {
   readonly currentUser   = signal<MeResponse | null>(null);
   readonly userLoading   = signal(true);
 
-  // ── Sincronização ────────────────────────────────
-  selectedInterval       = this.settingsService.syncIntervalMs();
-
   // ── Toast position ───────────────────────────────
   selectedPosition: ToastPosition = this.settingsService.toastPosition();
 
   // ── Configs de alerta ────────────────────────────
   readonly alertConfigs  = signal<AlertConfigResponse[]>([]);
   readonly configLoading = signal(true);
-  readonly configSaving   = signal(false);
-  readonly savingInterval = signal(false);
+  readonly configSaving  = signal(false);
 
   newType: 'EMAIL' | 'PUSH' = 'EMAIL';
   newDest = '';
@@ -83,21 +79,6 @@ export class SettingsComponent implements OnInit {
 
   setTheme(theme: 'light' | 'dark'): void {
     this.themeService.setTheme(theme);
-  }
-
-  saveSyncInterval(): void {
-    if (this.savingInterval()) return;
-    this.savingInterval.set(true);
-    this.settingsService.saveSyncInterval(this.selectedInterval).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => {
-        this.savingInterval.set(false);
-        this.toast.success('Intervalo de sync salvo. Polling atualizado.');
-      },
-      error: () => {
-        this.savingInterval.set(false);
-        this.toast.error('Erro ao salvar intervalo de sync.');
-      }
-    });
   }
 
   saveToastPosition(): void {

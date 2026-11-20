@@ -1,12 +1,12 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { switchMap } from 'rxjs';
 import { ProductService } from '../../core/services/product.service';
 import { ToastService } from '../../core/services/toast.service';
 import { SseService } from '../../core/services/sse.service';
 import { ProductResponse } from '../../core/models/product.model';
 import { TopbarComponent } from '../../shared/components/topbar/topbar.component';
+import { apiErrorMessage } from '../../core/http/api-error';
 
 type Filter = 'all' | 'critical' | 'outofstock';
 
@@ -37,14 +37,8 @@ export class ProductsComponent implements OnInit {
   ngOnInit(): void {
     this.load();
 
-    // SSE: recarrega lista quando uma sync é concluída no backend
-    this.sse.on('sync').pipe(
-      switchMap(() => {
-        this.load();
-        return [];
-      }),
-      takeUntilDestroyed(this.destroyRef)
-    ).subscribe();
+    // SSE: alerta disparado → estoque mudou, recarrega a lista
+    this.sse.on('alert').pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load());
   }
 
   load(): void {
@@ -65,7 +59,7 @@ export class ProductsComponent implements OnInit {
       this.productService.getAll(this.currentPage()).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: res => {
           this.rows.set(res.content);
-          this.totalPages.set(res.totalPages);
+          this.totalPages.set(res.page.totalPages);
           this.loading.set(false);
         },
         error: () => { this.loading.set(false); this.toast.error('Erro ao carregar produtos.'); }
@@ -108,9 +102,9 @@ export class ProductsComponent implements OnInit {
         this.saving.set(false);
         this.toast.success('Estoque mínimo atualizado.');
       },
-      error: () => {
+      error: err => {
         this.saving.set(false);
-        this.toast.error('Erro ao salvar estoque mínimo.');
+        this.toast.error(apiErrorMessage(err, [400, 404], 'Erro ao salvar estoque mínimo.'));
       }
     });
   }
