@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { switchMap } from 'rxjs';
 import { ProductService } from '../../core/services/product.service';
 import { ToastService } from '../../core/services/toast.service';
 import { SseService } from '../../core/services/sse.service';
@@ -37,14 +36,8 @@ export class ProductsComponent implements OnInit {
   ngOnInit(): void {
     this.load();
 
-    // SSE: recarrega lista quando uma sync é concluída no backend
-    this.sse.on('sync').pipe(
-      switchMap(() => {
-        this.load();
-        return [];
-      }),
-      takeUntilDestroyed(this.destroyRef)
-    ).subscribe();
+    // SSE: alerta disparado → estoque mudou, recarrega a lista
+    this.sse.on('alert').pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load());
   }
 
   load(): void {

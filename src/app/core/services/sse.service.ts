@@ -3,7 +3,7 @@ import { Subject, Observable } from 'rxjs';
 import { filter, map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 
-export type SseEventType = 'sync' | 'alert' | 'config' | 'heartbeat';
+export type SseEventType = 'alert' | 'config' | 'heartbeat';
 
 @Injectable({ providedIn: 'root' })
 export class SseService {
@@ -40,7 +40,7 @@ export class SseService {
     const url = `${environment.apiUrl}/api/v1/events?token=${encodeURIComponent(token)}`;
     this.es = new EventSource(url);
 
-    for (const type of ['sync', 'alert', 'config', 'heartbeat'] as SseEventType[]) {
+    for (const type of ['alert', 'config', 'heartbeat'] as SseEventType[]) {
       this.es.addEventListener(type, () => {
         this.zone.run(() => this.events$.next(type));
       });

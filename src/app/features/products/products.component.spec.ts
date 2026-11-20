@@ -41,4 +41,15 @@ describe('ProductsComponent', () => {
     expect(cmp.rows()).toEqual([product]);
     expect(cmp.totalPages()).toBe(3);
   });
+
+  it('recarrega a lista quando chega um evento SSE "alert"', () => {
+    const getAll = vi.fn(() => of(pageOf([product])));
+    const { cmp, events } = setup({ getAll } as unknown as Partial<ProductService>);
+    cmp.ngOnInit();
+    expect(getAll).toHaveBeenCalledTimes(1);
+
+    events['alert'].next();
+
+    expect(getAll).toHaveBeenCalledTimes(2);
+  });
 });
