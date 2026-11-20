@@ -6,6 +6,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { SseService } from '../../core/services/sse.service';
 import { ProductResponse } from '../../core/models/product.model';
 import { TopbarComponent } from '../../shared/components/topbar/topbar.component';
+import { apiErrorMessage } from '../../core/http/api-error';
 
 type Filter = 'all' | 'critical' | 'outofstock';
 
@@ -101,9 +102,9 @@ export class ProductsComponent implements OnInit {
         this.saving.set(false);
         this.toast.success('Estoque mínimo atualizado.');
       },
-      error: () => {
+      error: err => {
         this.saving.set(false);
-        this.toast.error('Erro ao salvar estoque mínimo.');
+        this.toast.error(apiErrorMessage(err, [400, 404], 'Erro ao salvar estoque mínimo.'));
       }
     });
   }

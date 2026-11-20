@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { Subject, of } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { AlertsComponent } from './alerts.component';
 import { AlertService } from '../../core/services/alert.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -34,5 +35,26 @@ describe('AlertsComponent', () => {
     expect(cmp.totalPages()).toBe(3);
     expect(cmp.currentPage()).toBe(2);
     expect(cmp.pages()).toEqual([0, 1, 2]);
+  });
+
+  it.each([422, 429, 502])('generateReport mostra a mensagem do back no erro %i', status => {
+    const generateReport = vi.fn(() => throwError(() => new HttpErrorResponse({
+      status, error: { error: `mensagem do back ${status}` }
+    })));
+    const { cmp, toast } = setup({ generateReport } as unknown as Partial<AlertService>);
+
+    cmp.generateReport(7);
+
+    expect(toast.error).toHaveBeenCalledWith(`mensagem do back ${status}`);
+    expect(cmp.reportLoading()).toBe(false);
+  });
+
+  it('generateReport usa mensagem genérica quando o back não manda corpo', () => {
+    const generateReport = vi.fn(() => throwError(() => new HttpErrorResponse({ status: 0 })));
+    const { cmp, toast } = setup({ generateReport } as unknown as Partial<AlertService>);
+
+    cmp.generateReport(30);
+
+    expect(toast.error).toHaveBeenCalledWith('Erro ao gerar relatório.');
   });
 });

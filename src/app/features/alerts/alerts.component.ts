@@ -6,6 +6,7 @@ import { SseService } from '../../core/services/sse.service';
 import { AlertResponse, AlertStatus, AlertType } from '../../core/models/alert.model';
 import { TopbarComponent } from '../../shared/components/topbar/topbar.component';
 import { BrDatePipe } from '../../shared/pipes/br-date.pipe';
+import { apiErrorMessage } from '../../core/http/api-error';
 
 type Filter = 'all' | AlertStatus | AlertType;
 
@@ -75,9 +76,10 @@ export class AlertsComponent implements OnInit {
         this.reportLoading.set(false);
         this.toast.success(res.message);
       },
-      error: () => {
+      error: err => {
         this.reportLoading.set(false);
-        this.toast.error('Erro ao gerar relatório.');
+        // 422 sem e-mail configurado · 429 limite · 502 falha parcial no provedor
+        this.toast.error(apiErrorMessage(err, [422, 429, 502], 'Erro ao gerar relatório.'));
       }
     });
   }

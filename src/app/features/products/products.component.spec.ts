@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { Subject, of } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ProductsComponent } from './products.component';
 import { ProductService } from '../../core/services/product.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -51,5 +52,30 @@ describe('ProductsComponent', () => {
     events['alert'].next();
 
     expect(getAll).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([400, 404])('saveEdit mostra a mensagem do back no erro %i', status => {
+    const updateMinStock = vi.fn(() => throwError(() => new HttpErrorResponse({
+      status, error: { error: `erro ${status} do back` }
+    })));
+    const { cmp, toast } = setup({ updateMinStock } as unknown as Partial<ProductService>);
+    cmp.editingValue.set(5);
+
+    cmp.saveEdit(product);
+
+    expect(toast.error).toHaveBeenCalledWith(`erro ${status} do back`);
+    expect(cmp.saving()).toBe(false);
+  });
+
+  it('saveEdit mostra o detalhe do campo quando a validação falha', () => {
+    const updateMinStock = vi.fn(() => throwError(() => new HttpErrorResponse({
+      status: 400, error: { error: 'Validation failed', fields: { minStock: 'must be greater than or equal to 0.0' } }
+    })));
+    const { cmp, toast } = setup({ updateMinStock } as unknown as Partial<ProductService>);
+    cmp.editingValue.set(5);
+
+    cmp.saveEdit(product);
+
+    expect(toast.error).toHaveBeenCalledWith('Validation failed: must be greater than or equal to 0.0');
   });
 });
