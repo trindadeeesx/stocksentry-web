@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { map, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { AuthResponse, LoginRequest, MeEnvelope, MeResponse } from '../models/auth.model';
+import { AuthResponse, LoginRequest, MeEnvelope, MeResponse, RegisterRequest } from '../models/auth.model';
 import { SseService } from './sse.service';
 
 @Injectable({ providedIn: 'root' })
@@ -17,11 +17,20 @@ export class AuthService {
 
   login(body: LoginRequest) {
     return this.http.post<AuthResponse>(`${this.base}/api/v1/auth/login`, body).pipe(
-      tap(res => {
-        localStorage.setItem('stocksentry_token', res.token);
-        this.sse.connect();
-      })
+      tap(res => this.startSession(res))
     );
+  }
+
+  /** Cria empresa + admin e já abre a sessão, igual ao login. */
+  register(body: RegisterRequest) {
+    return this.http.post<AuthResponse>(`${this.base}/api/v1/auth/register`, body).pipe(
+      tap(res => this.startSession(res))
+    );
+  }
+
+  private startSession(res: AuthResponse): void {
+    localStorage.setItem('stocksentry_token', res.token);
+    this.sse.connect();
   }
 
   fetchMe() {
