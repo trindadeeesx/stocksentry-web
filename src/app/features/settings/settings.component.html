@@ -189,6 +189,52 @@
         </div>
       </section>
 
+      <!-- ── Equipe (só ADMIN) ────────────────────────────── -->
+      @if (isAdmin()) {
+        <section class="card" id="equipe">
+          <div class="card__header">
+            <h2 class="card__title">Equipe</h2>
+            <p class="card__desc">Usuários da empresa. Operadores movimentam estoque, mas não gerenciam a equipe.</p>
+          </div>
+
+          <div class="card__body">
+            @if (teamLoading() && team().length === 0) {
+              <span class="sk sk--text-sm sk--w-1\/2"></span>
+            } @else {
+              <div class="team-scroll">
+                <table class="team-table">
+                  <thead>
+                    <tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Ativo</th></tr>
+                  </thead>
+                  <tbody>
+                    @for (u of team(); track u.id) {
+                      <tr>
+                        <td>{{ u.name }}</td>
+                        <td>{{ u.email }}</td>
+                        <td><span class="role-chip">{{ u.role }}</span></td>
+                        <td>{{ u.active ? 'Sim' : 'Não' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+
+            <form class="add-form" (ngSubmit)="addOperator()">
+              <input class="form-input" name="opName" type="text" placeholder="Nome"
+                     aria-label="Nome do operador" [(ngModel)]="opName" autocomplete="off" />
+              <input class="form-input" name="opEmail" type="email" placeholder="email@exemplo.com"
+                     aria-label="E-mail do operador" [(ngModel)]="opEmail" autocomplete="off" />
+              <input class="form-input" name="opPassword" type="password" placeholder="Senha (mín. 8)"
+                     aria-label="Senha do operador" [(ngModel)]="opPassword" autocomplete="new-password" />
+              <button class="btn-primary" type="submit" [disabled]="opSaving()">
+                @if (opSaving()) { Adicionando... } @else { Adicionar operador }
+              </button>
+            </form>
+          </div>
+        </section>
+      }
+
       <!-- ── Conta ───────────────────────────────────────── -->
       <section class="card">
         <div class="card__header">
@@ -212,6 +258,7 @@
                 <p class="user-role">
                   <span class="role-chip">{{ currentUser()!.role }}</span>
                 </p>
+                <p class="user-email">Empresa: {{ currentUser()!.tenant.name }}</p>
               </div>
             </div>
           }

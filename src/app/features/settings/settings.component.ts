@@ -1,12 +1,16 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
+import { computed } from '@angular/core';
 import { interval, switchMap } from 'rxjs';
 import { SseService } from '../../core/services/sse.service';
 import { AuthService } from '../../core/services/auth.service';
 import { AlertService } from '../../core/services/alert.service';
 import { PushService } from '../../core/services/push.service';
 import { SettingsService, ToastPosition } from '../../core/services/settings.service';
+import { UserService } from '../../core/services/user.service';
+import { UserResponse } from '../../core/models/user.model';
+import { apiErrorMessage } from '../../core/http/api-error';
 import { ToastService } from '../../core/services/toast.service';
 import { ThemeService } from '../../core/services/theme.service';
 import { AlertConfigResponse, AlertConfigRequest } from '../../core/models/alert.model';
@@ -32,10 +36,21 @@ export class SettingsComponent implements OnInit {
   readonly themeService           = inject(ThemeService);
   readonly pushService            = inject(PushService);
   private readonly sse            = inject(SseService);
+  private readonly userService    = inject(UserService);
 
   // ── Conta ────────────────────────────────────────
   readonly currentUser   = signal<MeResponse | null>(null);
   readonly userLoading   = signal(true);
+
+  // ── Equipe (só ADMIN) ────────────────────────────
+  readonly isAdmin    = computed(() => this.currentUser()?.role === 'ADMIN');
+  readonly team       = signal<UserResponse[]>([]);
+  readonly teamLoading = signal(false);
+  readonly opSaving   = signal(false);
+
+  opName = '';
+  opEmail = '';
+  opPassword = '';
 
   // ── Toast position ───────────────────────────────
   selectedPosition: ToastPosition = this.settingsService.toastPosition();
@@ -52,7 +67,11 @@ export class SettingsComponent implements OnInit {
     this.pushService.init();
 
     this.authService.fetchMe().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: user => { this.currentUser.set(user); this.userLoading.set(false); },
+      next: user => {
+        this.currentUser.set(user);
+        this.userLoading.set(false);
+        if (this.isAdmin()) this.loadTeam();
+      },
       error: ()   => this.userLoading.set(false)
     });
 
@@ -75,6 +94,48 @@ export class SettingsComponent implements OnInit {
       switchMap(() => this.alertService.getConfig()),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe(configs => this.alertConfigs.set(configs));
+  }
+
+  loadTeam(): void {
+    if (!this.isAdmin()) return;
+    this.teamLoading.set(true);
+    this.userService.list().subscribe({
+      next: list => { this.team.set(list); this.teamLoading.set(false); },
+      error: err => {
+        this.teamLoading.set(false);
+        this.toast.error(apiErrorMessage(err, [403], 'Erro ao carregar a equipe.'));
+      }
+    });
+  }
+
+  addOperator(): void {
+    if (!this.isAdmin() || this.opSaving()) return;
+    const name = this.opName.trim();
+    const email = this.opEmail.trim();
+    if (!name || !EMAIL_RE.test(email)) {
+      this.toast.error('Informe o nome e um e-mail válido.');
+      return;
+    }
+    if (this.opPassword.length < 8) {
+      this.toast.error('A senha precisa ter pelo menos 8 caracteres.');
+      return;
+    }
+
+    this.opSaving.set(true);
+    this.userService.createOperator({ name, email, password: this.opPassword }).subscribe({
+      next: () => {
+        this.opSaving.set(false);
+        this.opName = ''; this.opEmail = ''; this.opPassword = '';
+        this.toast.success('Operador adicionado.');
+        this.loadTeam();
+      },
+      error: err => {
+        this.opSaving.set(false);
+        this.toast.error(err?.status === 403
+          ? 'Você não tem permissão para gerenciar usuários.'
+          : apiErrorMessage(err, [400, 409], 'Erro ao adicionar operador.'));
+      }
+    });
   }
 
   setTheme(theme: 'light' | 'dark'): void {
