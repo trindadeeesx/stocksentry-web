@@ -1,0 +1,88 @@
+<div class="login-page">
+  <div class="login-card">
+
+    <div class="login-brand">
+      <span class="brand-logo" aria-hidden="true">S</span>
+      <div class="brand-text">
+        <span class="brand-name">StockSentry</span>
+        <span class="brand-sub">Gestão de Estoque · Criar conta</span>
+      </div>
+    </div>
+
+    <div class="login-divider"></div>
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="login-form" novalidate>
+      <div class="field" [class.field--error]="(form.controls.tenantName.invalid && form.controls.tenantName.touched) || fieldErrors()['tenantName']">
+        <label for="tenantName">Nome da empresa</label>
+        <input id="tenantName" type="text" formControlName="tenantName" placeholder="Minha Loja" autocomplete="organization" />
+        @if (form.controls.tenantName.touched && form.controls.tenantName.hasError('required')) {
+          <span class="field__error" role="alert">Nome da empresa obrigatório</span>
+        } @else if (fieldErrors()['tenantName']) {
+          <span class="field__error" role="alert">{{ fieldErrors()['tenantName'] }}</span>
+        }
+      </div>
+
+      <div class="field" [class.field--error]="(form.controls.tenantSlug.invalid && form.controls.tenantSlug.touched) || fieldErrors()['tenantSlug']">
+        <label for="tenantSlug">Identificador da empresa</label>
+        <input id="tenantSlug" type="text" formControlName="tenantSlug" placeholder="minha-loja" autocomplete="off" (input)="onSlugInput()" />
+        @if (form.controls.tenantSlug.touched && form.controls.tenantSlug.hasError('required')) {
+          <span class="field__error" role="alert">Identificador obrigatório</span>
+        } @else if (form.controls.tenantSlug.touched && form.controls.tenantSlug.hasError('pattern')) {
+          <span class="field__error" role="alert">Use só letras minúsculas, números e hífens (ex.: minha-loja)</span>
+        } @else if (fieldErrors()['tenantSlug']) {
+          <span class="field__error" role="alert">{{ fieldErrors()['tenantSlug'] }}</span>
+        }
+      </div>
+
+      <div class="field" [class.field--error]="(form.controls.name.invalid && form.controls.name.touched) || fieldErrors()['name']">
+        <label for="name">Seu nome</label>
+        <input id="name" type="text" formControlName="name" placeholder="Seu nome" autocomplete="name" />
+        @if (form.controls.name.touched && form.controls.name.hasError('required')) {
+          <span class="field__error" role="alert">Nome obrigatório</span>
+        } @else if (fieldErrors()['name']) {
+          <span class="field__error" role="alert">{{ fieldErrors()['name'] }}</span>
+        }
+      </div>
+
+      <div class="field" [class.field--error]="(form.controls.email.invalid && form.controls.email.touched) || fieldErrors()['email']">
+        <label for="email">E-mail</label>
+        <input id="email" type="email" formControlName="email" placeholder="seu@email.com" autocomplete="email" />
+        @if (form.controls.email.touched && form.controls.email.hasError('required')) {
+          <span class="field__error" role="alert">E-mail obrigatório</span>
+        } @else if (form.controls.email.touched && form.controls.email.hasError('email')) {
+          <span class="field__error" role="alert">E-mail inválido</span>
+        } @else if (fieldErrors()['email']) {
+          <span class="field__error" role="alert">{{ fieldErrors()['email'] }}</span>
+        }
+      </div>
+
+      <div class="field" [class.field--error]="(form.controls.password.invalid && form.controls.password.touched) || fieldErrors()['password']">
+        <label for="password">Senha</label>
+        <input id="password" type="password" formControlName="password" placeholder="Mínimo de 8 caracteres" autocomplete="new-password" />
+        @if (form.controls.password.touched && form.controls.password.invalid) {
+          <span class="field__error" role="alert">A senha precisa ter pelo menos 8 caracteres</span>
+        } @else if (fieldErrors()['password']) {
+          <span class="field__error" role="alert">{{ fieldErrors()['password'] }}</span>
+        }
+      </div>
+
+      @if (errorMessage()) {
+        <p class="field__error" role="alert">{{ errorMessage() }}</p>
+      }
+
+      <button type="submit" class="btn-submit" [disabled]="loading()">
+        @if (loading()) {
+          <span class="spinner" aria-hidden="true"></span>
+          Criando...
+        } @else {
+          Criar conta
+        }
+      </button>
+
+      <p class="field__error" style="color: var(--color-text-muted); text-align: center">
+        Já tem conta? <a routerLink="/login">Entrar</a>
+      </p>
+    </form>
+
+  </div>
+</div>
