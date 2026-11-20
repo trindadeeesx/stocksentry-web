@@ -1,487 +1,95 @@
-# CLAUDE.md — StockSentry Frontend
+# StockSentry Web
 
-> **Documento de contrato frontend × backend.**
-> Descreve o que o frontend faz, o que exibe, o que permite o usuário alterar, e exatamente quais endpoints consome — incluindo formato de request e response esperado.
+Front do StockSentry: controle de estoque multi-tenant com alerta de estoque crítico por e-mail e push (Web Push/VAPID). Cada empresa (tenant) tem usuários com papel `ADMIN` ou `OPERATOR`. O produto é genérico, sem marca de nenhum cliente. Back em repositório separado (`stocksentry/`, Spring Boot).
 
----
+## Stack e comandos
 
-## Visão geral
+Angular 21 (standalone + signals), TypeScript 5.9, RxJS 7.8, SCSS, Vitest (via `ng test`) + jsdom. Sem lib de UI nem de estado.
 
-**StockSentry** é um painel administrativo de monitoramento de estoque em tempo real para a Meiliy Cosméticos. Usuário único: o dono da loja. O frontend é uma SPA Angular servida estáticamente; o backend é um Spring Boot rodando em `http://localhost:8080`.
+| Comando | O que faz |
+|---|---|
+| `npm start` | `ng serve` com `proxy.conf.json` (`/api` -> `http://localhost:8080`) |
+| `npm run build` | build de produção em `dist/stocksentry-web/browser` |
+| `npm test` | `ng test` (Vitest) |
 
-**Stack frontend:** Angular 21 · Standalone Components · Angular Signals · RxJS (apenas onde HttpClient exige) · SCSS puro com CSS custom properties · Vitest para testes · sem Tailwind, sem Bootstrap, sem Axios.
+- Em dev `environment.apiUrl` é `''`: as chamadas vão para a mesma origem e o proxy repassa ao back.
+- Em produção `environment.apiUrl` lê `window.__env.apiUrl` de `public/env.js`. No deploy, `entrypoint.sh` gera `env.js` a partir de `env.js.template` com `envsubst` da variável `API_URL` e injeta `PORT` no nginx. `env.js` nunca é cacheado (ver `nginx.conf`).
+- Deploy: `Dockerfile` (build com node 20, serve com nginx, porta 8080) + `railway.json`.
 
----
+## Estrutura (`src/app/`)
 
-## Comandos de desenvolvimento
+- `app.ts`: inicia o tema, conecta o SSE se já há token e, no evento `config`, reconcilia a subscription push local com o back.
+- `app.config.ts`: `provideRouter(withComponentInputBinding)` e `provideHttpClient` com `authInterceptor` e `errorInterceptor`.
+- `core/guards/`: `authGuard`.
+- `core/interceptors/`: `auth.interceptor.ts`, `error.interceptor.ts`.
+- `core/http/api-error.ts`: `apiErrorMessage(err, statuses, fallback)`.
+- `core/models/`: tipos da API (`auth`, `product`, `alert`, `user`).
+- `core/services/`: `auth`, `sse`, `push`, `alert`, `product`, `user`, `settings`, `theme`, `toast`.
+- `features/`: `login`, `register` (com `slugify.ts`), `dashboard`, `products`, `alerts`, `settings`, `not-found`.
+- `shared/`: `components/topbar`, `components/toast`, `pipes/br-date.pipe.ts`.
+- `src/styles/`: `_variables.scss` (tokens), `_reset`, `_typography`, `_skeleton`; `src/styles.scss` os importa.
+- `public/`: `env.js`, `env.js.template`, `sw.js` (service worker de push), `favicon.ico`.
 
-```bash
-ng serve                                              # dev → http://localhost:4200 (proxya /api → localhost:8080)
-ng build --configuration production                   # build de produção
-npx vitest run                                        # testes (single run)
-ng lint
-```
+## Rotas e guards
 
----
+Todas com `loadComponent` (lazy) e título "<Tela> — StockSentry".
 
-## Arquitetura de arquivos
-
-```
-src/app/
-  core/
-    guards/         authGuard — CanActivateFn, checa token no localStorage
-    interceptors/   authInterceptor (Bearer header), errorInterceptor (retry + 401 → /login)
-    models/         interfaces TypeScript (sem classes): alert, auth, product, sync
-    services/       auth, product, alert, sync, settings, theme, toast, sse, push
-  features/
-    login/          página de autenticação
-    dashboard/      visão geral + polling reativo + painel debug PDV
-    products/       listagem + edição inline de estoque mínimo
-    alerts/         histórico de alertas + geração de relatório
-    settings/       configurações da conta, sync, canais de alerta, UI
-    not-found/      página 404
-  shared/
-    components/
-      topbar/       barra de navegação global (desktop + mobile bottom nav)
-      toast/        container de notificações posicionável
-    pipes/
-      br-date       formata ISO 8601 → dd/MM/yyyy HH:mm (pt-BR)
-src/styles/
-  _variables.scss   CSS custom properties (light + dark theme)
-  _reset.scss
-  _typography.scss
-  _skeleton.scss
-  styles.scss
-src/environments/
-  environment.ts          apiUrl: '' (usa proxy em dev)
-  environment.prod.ts     apiUrl: window.__env?.apiUrl ?? ''
-public/sw.js              service worker para Web Push
-proxy.conf.json           proxia /api → http://localhost:8080 em dev
-```
-
----
-
-## Rotas (todas lazy-loaded)
-
-| Rota | Componente | Guard |
+| Rota | Tela | Acesso |
 |---|---|---|
-| `/login` | LoginComponent | — |
-| `/` | → redirect `/dashboard` | authGuard |
-| `/dashboard` | DashboardComponent | authGuard |
-| `/products` | ProductsComponent | authGuard |
-| `/alerts` | AlertsComponent | authGuard |
-| `/settings` | SettingsComponent | authGuard |
-| `/404` | NotFoundComponent | — |
-| `/**` | → redirect `/404` | — |
+| `/login`, `/register` | login, cadastro de empresa + admin | públicas; redirecionam a `/dashboard` se já há token |
+| `/` | redireciona a `/dashboard` | `authGuard` |
+| `/dashboard`, `/products`, `/alerts`, `/settings` | telas principais | `authGuard` |
+| `/404`, `**` | não encontrado | pública |
 
-`authGuard` verifica `localStorage.getItem('stocksentry_token')`. Se ausente, redireciona para `/login`.
-
----
-
-## Autenticação
-
-- Token JWT armazenado em `localStorage` na chave `stocksentry_token`.
-- `authInterceptor` injeta `Authorization: Bearer <token>` em **todas** as requisições.
-- `errorInterceptor` faz retry automático (1x, delay 800ms) apenas para erros de rede/servidor (5xx). Erros 4xx não são retentados. Em caso de 401, limpa o token e redireciona para `/login`.
-- Login redireciona automaticamente para `/dashboard` se já houver token válido.
-- Ao fazer login, `AuthService` também chama `SseService.connect()`.
+- `authGuard` só checa se existe `stocksentry_token` no `localStorage`; não valida o JWT nem o papel. Não há guard de papel: a seção "Equipe" em `/settings` aparece só se `currentUser.role === 'ADMIN'` e o back responde 403 aos demais.
 
----
-
-## Tempo real — SSE (Server-Sent Events)
-
-`SseService` abre um `EventSource` em `GET /api/v1/events?token={jwt}` logo após o login.
-
-**Tipos de evento:**
-
-| Tipo | Quem escuta | Ação |
-|---|---|---|
-| `sync` | DashboardComponent, ProductsComponent | Refaz fetch de dados imediatamente |
-| `alert` | AlertsComponent | Refaz fetch do histórico de alertas |
-| `config` | AppComponent, SettingsComponent | Sincroniza estado de push; SettingsComponent também recarrega configs |
-| `heartbeat` | — | Mantém conexão viva (ignorado pelos componentes) |
-
-- Reconecta automaticamente quando a aba volta a ser visível (`visibilitychange`).
-- O token é passado via query string (EventSource não suporta headers customizados).
-- `AppComponent` escuta `config` para chamar `PushService.syncWithConfigs()`.
-- `SettingsComponent` tem fallback de polling de 20s para `config` além do SSE.
-
----
-
-## Páginas — o que o usuário vê e faz
+## Auth, SSE e push
 
-### Login (`/login`)
+**Sessão.** O JWT fica em `localStorage` (`stocksentry_token`). `AuthService.login`/`register` gravam o token e chamam `sse.connect()`. `fetchMe()` lê `GET /auth/me` (resposta embrulhada em `{ user }`) e preenche o signal `currentUser`. `logout()` desconecta o SSE, limpa o token e vai a `/login`.
 
-**Exibe:**
-- Logotipo + nome da empresa
-- Formulário com campos e-mail e senha
-- Validação inline (campo obrigatório, formato de e-mail)
-- Estado de carregamento no botão ("Entrando...")
-- Toast de erro para credenciais inválidas (401/403) ou falha de conexão
-
-**Ação:** `POST /api/v1/auth/login`
+**Interceptors.** `authInterceptor` põe `Authorization: Bearer`. `errorInterceptor` tenta de novo 1 vez (após 800 ms) só em erro de rede/5xx; em 401 remove o token e navega a `/login`.
 
----
-
-### Dashboard (`/dashboard`)
-
-**Exibe:**
-- Timestamp da última sincronização ("Última sync: dd/MM/yyyy HH:mm")
-- 5 cards de estatísticas: **Críticos**, **Zerados**, **Criados**, **Atualizados**, **Recuperados** (dados da última sync)
-- Tabela **Estoque Crítico**: nome, SKU, estoque atual (com chip colorido), estoque mínimo — até 15 itens, link "ver todos" se houver mais
-- Tabela **Estoque Zerado**: nome, SKU, unidade, estoque mínimo
-- Estados de skeleton loading em todos os elementos enquanto carrega
-- Empty states ("Tudo normal", "Nenhum produto com estoque zerado")
-- Botão **Forçar Sync** com spinner durante operação
-- **Painel debug PDV** (toggle): lista produtos do PDV com edição inline de estoque + botão de sync manual
-
-**Polling reativo:** ao entrar na página, dispara `POST /api/v1/sync/now` imediatamente, depois faz fetch dos dados. Intervalo de polling configurável via backend (padrão 5 min); quando o usuário altera nas Configurações, o `interval$` do dashboard se recria automaticamente via `toObservable + switchMap`. SSE `sync` também dispara `fetchAll()`.
-
-**Ações do usuário:**
-- Clicar em **Forçar Sync** → `POST /api/v1/sync/now` + refresh dos dados
-- (Debug) Editar estoque de produto no PDV → `PATCH /api/v1/debug/pdv/products/{id}/stock`
-- (Debug) Sync manual pós-edição → `POST /api/v1/sync/now`
-
-**Endpoints consumidos:**
-- `POST /api/v1/sync/now`
-- `GET /api/v1/sync/status`
-- `GET /api/v1/products/critical`
-- `GET /api/v1/products/out-of-stock`
-- `GET /api/v1/settings` (ao entrar, para carregar o intervalo de polling)
-- `GET /api/v1/debug/pdv/products` (painel debug)
-- `PATCH /api/v1/debug/pdv/products/{id}/stock` — body: `{ "estoque": number }` (painel debug)
-
----
-
-### Produtos (`/products`)
-
-**Exibe:**
-- Filtros: **Todos** (paginado) · **Críticos** · **Zerados**
-- Tabela com colunas: Produto, SKU, Un., Estoque, Mínimo, Status, Ações
-- Chip de estoque: vermelho escuro (zerado), laranja (crítico), sem destaque (normal)
-- Badge de status: `Zerado` · `Crítico` · `Normal`
-- Edição inline de estoque mínimo: campo numérico + botões Salvar / Cancelar diretamente na linha
-- Paginação numérica (Anterior / páginas / Próxima) — apenas quando `filter = 'all'`
-- Skeleton loading (8 linhas) durante carregamento
-
-**Atualização em tempo real:** SSE `sync` dispara reload da lista atual.
+**Erros do back.** Corpo `{"error": "..."}` (na validação, com `fields`). Use `apiErrorMessage` e só exiba a mensagem do back nos status esperados; senão, texto fixo em PT-BR.
 
-**Ações do usuário:**
-- Alternar filtro → recarrega lista do endpoint correspondente
-- Navegar entre páginas (apenas no filtro "Todos")
-- Clicar **Editar mín.** → edição inline ativada na linha
-- Salvar novo valor mínimo → `PATCH /api/v1/products/{id}/min-stock`
-- Cancelar edição → descarta alteração
-
-**Endpoints consumidos:**
-- `GET /api/v1/products?page={n}&size=20&sort=name,asc`
-- `GET /api/v1/products/critical`
-- `GET /api/v1/products/out-of-stock`
-- `PATCH /api/v1/products/{id}/min-stock` — body: `{ "minStock": number }`
-
----
-
-### Alertas (`/alerts`)
-
-**Exibe:**
-- Filtros: **Todos** · **Enviados** (SENT) · **Falhos** (FAILED) · **E-mail** · **Push**
-- Tabela com colunas: Data/Hora, Produto, Tipo, Destino, Status
-- Chip de tipo: `EMAIL` / `PUSH`
-- Chip de status: `Enviado` (verde) / `Falhou` (vermelho)
-- Data formatada em pt-BR via `brDate` pipe
-- Paginação numérica
-- Skeleton loading (8 linhas)
-- Empty state ("Nenhum alerta encontrado.")
-
-**Atualização em tempo real:** SSE `alert` dispara reload da página atual.
-
-**Ações do usuário:**
-- Alternar filtro → filtra localmente a página atual (sem nova requisição)
-- Navegar páginas → nova requisição com a página selecionada
-- Clicar **Relatório 7 dias** → `POST /api/v1/alerts/report?days=7`
-- Clicar **Relatório 30 dias** → `POST /api/v1/alerts/report?days=30`
-
-**Endpoints consumidos:**
-- `GET /api/v1/alerts/history?page={n}&size=20`
-- `POST /api/v1/alerts/report?days={7|30}` — response: `{ message: string }`
-
----
-
-### Configurações (`/settings`)
-
-Dividida em 5 seções:
-
-#### Aparência
-- Seleção de tema **Claro / Escuro** — persiste em `localStorage`, aplica imediatamente. Detecta `prefers-color-scheme` na primeira visita.
-
-#### Sincronização automática
-- Select com opções: 1 min, 2 min, 5 min, 10 min, 15 min, 30 min, 1 hora
-- Botão **Salvar intervalo** → `PATCH /api/v1/settings` — atualiza o backend e o polling do dashboard reage imediatamente (sem reload)
-- Estado de carregamento no botão ("Salvando...")
-
-#### Canais de alerta
-- Lista de canais configurados (tipo + destino) com botão de remoção (confirm nativo)
-- Formulário de adição: select Tipo (EMAIL / PUSH) + campo Destino + botão Adicionar
-- Validação de formato de e-mail no frontend antes de enviar
-- Toast de sucesso/erro para cada operação
-- SSE `config` + polling de 20s atualizam a lista automaticamente
-
-#### Push notifications
-- Exibe o status atual da subscrição push deste dispositivo
-- Botão **Ativar notificações** ou **Desativar** conforme o estado
-- Status possíveis: `unsupported` · `denied` · `not-subscribed` · `subscribing` · `subscribed`
-
-#### Notificações na tela
-- Select de posição do toast: 6 opções (superior/inferior × esquerda/centro/direita)
-- Persiste apenas em `localStorage` (preferência puramente visual)
-
-#### Conta
-- Exibe nome, e-mail e role do usuário logado (avatar com inicial)
-- Botão **Encerrar sessão** → limpa token + desconecta SSE + redireciona para `/login`
-
-**Endpoints consumidos:**
-- `GET /api/v1/auth/me`
-- `GET /api/v1/alerts/config`
-- `POST /api/v1/alerts/config` — body: `{ "type": "EMAIL"|"PUSH", "destination": string }`
-- `DELETE /api/v1/alerts/config/{id}`
-- `GET /api/v1/settings`
-- `PATCH /api/v1/settings` — body: `{ "syncIntervalMs": number }`
-
----
-
-## Contrato completo de endpoints
-
-> Todos os endpoints exigem `Authorization: Bearer <token>`, exceto `POST /api/v1/auth/login` e `GET /api/v1/push/vapid-key`.
-
-### Auth
-
-```
-POST /api/v1/auth/login
-Body:    { "email": string, "password": string }
-200 OK:  { "token": string, "email": string, "role": string }
-
-GET /api/v1/auth/me
-200 OK:  { "id": string, "name": string, "email": string, "role": string }
-```
-
-### Products
-
-```
-GET /api/v1/products?page=0&size=20&sort=name,asc
-200 OK: {
-  "content": ProductResponse[],
-  "totalElements": number,
-  "totalPages": number,
-  "number": number,
-  "size": number
-}
-
-GET /api/v1/products/critical
-200 OK: ProductResponse[]
-
-GET /api/v1/products/out-of-stock
-200 OK: ProductResponse[]
-
-PATCH /api/v1/products/{id}/min-stock
-Body:    { "minStock": number }
-200 OK:  ProductResponse
-
-ProductResponse: {
-  "id": string,
-  "name": string,
-  "sku": string,
-  "unit": "UN" | "KG" | "L" | "CX",
-  "currentStock": number,
-  "minStock": number,
-  "active": boolean,
-  "critical": boolean,
-  "createdAt": string  // ISO 8601
-}
-```
-
-### Alerts
-
-```
-GET /api/v1/alerts/config
-200 OK: AlertConfigResponse[]
-
-POST /api/v1/alerts/config
-Body:    { "type": "EMAIL" | "PUSH", "destination": string }
-200 OK:  AlertConfigResponse
-
-DELETE /api/v1/alerts/config/{id}
-204 No Content
-
-AlertConfigResponse: {
-  "id": string,
-  "type": "EMAIL" | "PUSH",
-  "destination": string,
-  "active": boolean
-}
-
-GET /api/v1/alerts/history?page=0&size=20
-200 OK: {
-  "content": AlertResponse[],
-  "totalElements": number,
-  "totalPages": number,
-  "number": number,
-  "size": number
-}
-
-AlertResponse: {
-  "id": string,
-  "productName": string,
-  "type": "EMAIL" | "PUSH",
-  "destination": string,
-  "status": "SENT" | "FAILED",
-  "triggeredAt": string  // ISO 8601
-}
-
-POST /api/v1/alerts/report?days=7
-POST /api/v1/alerts/report?days=30
-200 OK: { "message": string }
-```
-
-### Sync
-
-```
-POST /api/v1/sync/now
-200 OK: (qualquer body — frontend ignora)
-
-GET /api/v1/sync/status
-200 OK: {
-  "lastSyncAt": string,     // ISO 8601
-  "lastCreated": number,
-  "lastUpdated": number,
-  "lastCritical": number,
-  "lastRecovered": number
-}
-```
-
-### Settings
-
-```
-GET /api/v1/settings
-200 OK: { "syncIntervalMs": number }
-
-PATCH /api/v1/settings
-Body:    { "syncIntervalMs": number }
-200 OK:  { "syncIntervalMs": number }
-```
-
-### Push Notifications
-
-```
-GET /api/v1/push/vapid-key          (sem auth)
-200 OK: { "publicKey": string }
-
-POST /api/v1/push/subscribe
-Body:    { "endpoint": string, "p256dh": string, "auth": string, "deviceName": string }
-200 OK: (qualquer body)
-
-DELETE /api/v1/push/subscribe?endpoint={url}
-204 No Content
-```
-
-### SSE
-
-```
-GET /api/v1/events?token={jwt}      (auth via query string)
-Content-Type: text/event-stream
-
-Eventos: sync | alert | config | heartbeat
-```
-
-### Debug PDV (desenvolvimento)
-
-```
-GET /api/v1/debug/pdv/products
-200 OK: PdvProduct[]
-
-PATCH /api/v1/debug/pdv/products/{id}/stock
-Body:    { "estoque": number }
-200 OK: (qualquer body)
-
-PdvProduct: {
-  "id": number,
-  "codigo": string,
-  "nome": string,
-  "estoque": number,
-  "unidade": string
-}
-```
-
----
-
-## Lógica de status de estoque
-
-| Condição | Label | Visual |
-|---|---|---|
-| `currentStock === 0` | Zerado | chip vermelho escuro |
-| `currentStock < minStock` (`critical: true`) | Crítico | chip laranja/vermelho |
-| caso contrário | Normal | chip neutro/verde |
-
-O campo `critical` retornado pelo backend deve espelhar `currentStock < minStock`.
-
----
-
-## Comportamentos notáveis
-
-- **Polling reativo:** o intervalo de polling do dashboard é um signal derivado do backend. Alterar via Configurações → o `interval$` do dashboard se recria automaticamente via `toObservable + switchMap`, sem reload de página.
-- **SSE:** complementa o polling — qualquer evento `sync` do backend atualiza o dashboard imediatamente, independente do intervalo configurado.
-- **Skeleton loading:** todas as páginas exibem placeholders animados enquanto aguardam resposta do backend — nunca uma tela em branco.
-- **Toast system:** notificações posicionáveis (6 posições), máximo 5 simultâneos, auto-dismiss (4s success/info, 5s error), animação de entrada e saída.
-- **Dark mode:** persiste em `localStorage`, detecta `prefers-color-scheme` na primeira visita, aplica via `data-theme` no `<html>`.
-- **Retry automático:** erros de rede/servidor (5xx) são retentados 1 vez com delay de 800ms. Erros 4xx (incluindo 401) não são retentados.
-- **LocalStorage como cache:** o `syncIntervalMs` é cacheado localmente como fallback offline — o backend é a fonte de verdade, e o valor é atualizado ao abrir o dashboard.
-- **Push notifications:** `PushService` gerencia o ciclo de vida completo (pedir permissão, subscrever no navegador, registrar endpoint no backend, revogar). O nome do dispositivo é gerado e persistido em `localStorage`.
-- **Mobile:** topbar fixa no topo (desktop) + nav de ícones no rodapé fixo (mobile, 60px). `styles.scss` adiciona `padding-bottom` para compensar no conteúdo.
-
----
-
-## Variáveis CSS (tokens de design)
-
-```scss
-// Cores — modo claro
---color-brand:          #DC1960   // rosa Meiliy
---color-primary:        #020000   // topbar (preto absoluto, não muda com o tema)
-
---color-danger:         #c0392b
---color-warning:        #d97706
---color-success:        #16a34a
---color-info:           #2b6cb0
-
---color-bg:             #f4f4f5   // fundo das páginas
---color-surface:        #ffffff   // cards, tabelas
---color-surface-hover:  #f5f5f7
---color-border:         #e4e4e7
---color-text:           #18181b
---color-text-muted:     #71717a
-
-// Espaçamento
---spacing-xs: 4px  |  --spacing-sm: 8px  |  --spacing-md: 16px
---spacing-lg: 24px |  --spacing-xl: 32px
-
-// Bordas
---radius-sm: 5px  |  --radius-md: 8px  |  --radius-lg: 12px
-
-// Sombras
---shadow-sm  |  --shadow-md  |  --shadow-lg
-```
-
-Tema escuro via `[data-theme="dark"]`: inverte surfaces, ajusta status colors e sombras. `--color-primary` e `--color-brand` **não mudam** com o tema.
-
----
-
-## Restrições técnicas
-
-- Sem Tailwind, sem Bootstrap — SCSS puro com custom properties
-- Sem Axios — `HttpClient` do Angular exclusivamente
-- `signal()` sobre `BehaviorSubject` sempre que possível
-- `ChangeDetectionStrategy.OnPush` em todos os componentes de feature
-- Todos os componentes são standalone (sem NgModules)
-- Rotas usam `loadComponent` (lazy loading)
-- Backend retorna datas em ISO 8601; frontend formata com `BrDatePipe` → `dd/MM/yyyy HH:mm`
-- Paginação Spring: `{ content, totalElements, totalPages, number, size }`
-- Em desenvolvimento, `proxy.conf.json` proxia `/api` para `localhost:8080` — `environment.apiUrl` é `''`
-- Em produção, `apiUrl` vem de `window.__env.apiUrl` injetado no HTML
+**SSE (`SseService`).** `EventSource` não manda header, então cada conexão usa ticket de uso único: `POST /api/v1/events/ticket` (com Bearer) e depois `GET /api/v1/events?ticket=...`. Eventos: `alert`, `config`, `heartbeat`; consumo por `sse.on(tipo)`. No erro, fecha o stream e reconecta manualmente (novo ticket) com backoff de 2 s até 30 s; 429 espera 60 s; 401/403 não reconecta (o interceptor faz o logout). Aba oculta não conecta; reabre ao voltar a ficar visível. Dashboard e produtos recarregam em `alert`; dashboard também em `config`; alertas recarrega em `alert`.
+
+**Push (`PushService`).** Fluxo de `subscribe()`: pede permissão, busca `GET /push/vapid-key`, registra `/sw.js`, cria a subscription, `POST /push/subscribe` e `POST /alerts/config` (type PUSH, destination = nome do dispositivo derivado do user agent). O nome fica em `localStorage` (`stocksentry_push_device`). `unsubscribe()` faz `DELETE /push/subscribe`. O signal `status` assume `unsupported | denied | not-subscribed | subscribing | subscribed`.
+
+**Preferências locais.** `ThemeService` (`stocksentry_theme`, claro/escuro, usa `data-theme` no `<html>`) e `SettingsService` (`stocksentry_settings`, só a posição dos toasts). Nada disso vai ao back.
+
+## Convenções
+
+- Componentes `standalone`, estado com `signal`/`computed`, `inject()` em vez de construtor com parâmetros, `takeUntilDestroyed` nas assinaturas. Há mistura de `OnPush` e default; ao criar novo, prefira `OnPush`.
+- Formulários: reativos em login/register, `ngModel` em settings.
+- Textos de UI em PT-BR. Marca única: "StockSentry".
+- Cores e espaçamentos via variáveis CSS de `styles/_variables.scss` (marca `--color-brand: #0F766E`, teal; tema escuro em `[data-theme="dark"]`). Não hardcode cores novas.
+- Testes `*.spec.ts` ao lado do código (Vitest, `TestBed`, `HttpTestingController`). Existem para `auth`, `user`, `sse`, `slugify`, register, settings, products, alerts, dashboard e `app`.
+- Commits PT-BR em Conventional Commits, pequenos, uma branch por tarefa (`feature/`, `fix/`, `docs/`), sem `Co-Authored-By`. Push, PR e merge só quando o usuário pedir.
+
+## Contrato com o back
+
+Base `/api/v1`. Tudo exige Bearer, exceto `auth/login` e `auth/register`.
+
+| Método e caminho | Uso |
+|---|---|
+| `POST /auth/login`, `POST /auth/register` | devolvem `{ token, email, role, tenantId }`; register recebe `tenantName`, `tenantSlug`, `name`, `email`, `password` |
+| `GET /auth/me` | `{ user: { id, name, email, role, tenant } }` |
+| `GET /products?page&size&sort` | paginado: `{ content, page: { size, number, totalElements, totalPages } }` |
+| `GET /products/critical`, `GET /products/out-of-stock` | listas simples |
+| `PATCH /products/{id}/min-stock` | corpo `{ minStock }` |
+| `GET /alerts/history?page&size` | paginado, mesmo formato |
+| `GET/POST /alerts/config`, `DELETE /alerts/config/{id}` | canais EMAIL/PUSH |
+| `POST /alerts/report?days=7\|30` | gera relatório por e-mail |
+| `GET/POST /users` | listar e criar operador (só ADMIN; 403 caso contrário) |
+| `GET /push/vapid-key`, `POST/DELETE /push/subscribe` | Web Push |
+| `POST /events/ticket`, `GET /events?ticket=` | SSE |
+
+Os controllers do back para todos esses caminhos existem. Registro público tem rate limit (429), tratado na tela de cadastro; slug segue `^[a-z0-9]+(-[a-z0-9]+)*$`.
+
+## Pendências
+
+- **Redesign visual** a fazer: o CSS atual é provisório (register reaproveita o SCSS do login). Preserve a estrutura e os tokens de cor.
+- **Sem UI para criar produtos** nem **registrar movimentações de estoque** (entrada/saída): a listagem só lê e edita o estoque mínimo.
+- Mensagens de erro de alertas e produtos ainda são texto fixo, sem passar por `apiErrorMessage` (ex.: erro de validação 400/422 do back não aparece).
+- Settings faz polling de 20 s em `alerts/config` além do SSE, como fallback.
+- Não há guard de papel nas rotas nem renovação/validação de token no cliente.
